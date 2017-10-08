@@ -41,7 +41,7 @@ deploy:
   secret_access_key: $AWS_SECRET_ACCESS_KEY
   bucket: marvin-engine-executor
   local-dir: target/scala-2.12/marvin-engine-executor-assembly-0.0.1.jar
-  acl: ''
+  acl: public_read
   on:
     repo: marvin-ai/marvin-engine-executor
     branch: tk_travis_configuration
