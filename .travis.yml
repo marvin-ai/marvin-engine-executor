@@ -43,7 +43,7 @@ deploy:
   access_key_id: $AWS_SECRET_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
   bucket: marvin-engine-executor
-  local-dir: target/scala-2.12
+  local_dir: target/scala-2.12
   acl: public_read
   on:
     repo: marvin-ai/marvin-engine-executor
