@@ -19,6 +19,7 @@ import java.io.FileNotFoundException
 import java.util.concurrent.Executors
 
 import actions.HealthCheckResponse.Status
+import akka.actor.FSM.Event
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.event.LoggingAdapter
 import akka.event.Logging
@@ -41,6 +42,7 @@ import org.marvin.executor.actions.{OnlineAction, PipelineAction}
 import org.marvin.executor.actions.BatchAction.{BatchExecute, BatchHealthCheck, BatchReload}
 import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload}
 import org.marvin.executor.actions.PipelineAction.PipelineExecute
+import org.marvin.executor.statemachine.{EngineFSM, Reload}
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
@@ -62,6 +64,7 @@ object GenericHttpAPI extends HttpMarvinApp {
 
   var actors:Map[String, ActorRef] = _
   var predictorActor: ActorRef = _
+  var engineFSM: ActorRef = _
   var acquisitorActor: ActorRef = _
   var tpreparatorActor: ActorRef = _
   var trainerActor: ActorRef = _
@@ -215,7 +218,8 @@ object GenericHttpAPI extends HttpMarvinApp {
     val engineFilePath = s"${ConfigurationContext.getStringConfigOrDefault("engineHome", ".")}/engine.metadata"
     val paramsFilePath = s"${ConfigurationContext.getStringConfigOrDefault("engineHome", ".")}/engine.params"
 
-    GenericHttpAPI.system = api.setupSystem(engineFilePath, paramsFilePath)
+    val modelProtocolToLoad = ConfigurationContext.getStringConfigOrDefault("modelProtocol", "")
+    GenericHttpAPI.system = api.setupSystem(engineFilePath, paramsFilePath, modelProtocolToLoad)
     val ipAddress = ConfigurationContext.getStringConfigOrDefault("ipAddress", "localhost")
     val port = ConfigurationContext.getIntConfigOrDefault("port", 8000)
 
@@ -224,7 +228,7 @@ object GenericHttpAPI extends HttpMarvinApp {
 }
 
 trait GenericHttpAPI {
-  protected def setupSystem(engineFilePath:String, paramsFilePath:String): ActorSystem = {
+  protected def setupSystem(engineFilePath:String, paramsFilePath:String, modelProtocol:String): ActorSystem = {
     val metadata = readJsonIfFileExists[EngineMetadata](engineFilePath)
     val system = ActorSystem(s"MarvinExecutorSystem")
 
@@ -246,6 +250,11 @@ trait GenericHttpAPI {
     GenericHttpAPI.trainerActor = system.actorOf(Props(new BatchAction("trainer", metadata)), name = "trainerActor")
     GenericHttpAPI.evaluatorActor = system.actorOf(Props(new BatchAction("evaluator", metadata)), name = "evaluatorActor")
     GenericHttpAPI.pipelineActor = system.actorOf(Props(new PipelineAction(metadata)), name = "pipelineActor")
+    GenericHttpAPI.engineFSM = system.actorOf(Props(new EngineFSM(GenericHttpAPI.predictorActor)), name = "engineFsm")
+
+    if(!metadata.actionsMap.get("predictor").isEmpty){
+      GenericHttpAPI.engineFSM ! Reload(modelProtocol)
+    }
 
     GenericHttpAPI.actors = Map[String, ActorRef](
       "predictor" -> GenericHttpAPI.predictorActor,
@@ -296,8 +305,8 @@ trait GenericHttpAPI {
   def onlineExecute(actionName: String, params: String, message: String): Future[String] = {
     GenericHttpAPI.log.info(s"Request for $actionName] received.")
     implicit val ec = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
-    implicit val futureTimeout = GenericHttpAPI.healthCheckTimeout
-    (GenericHttpAPI.actors(actionName) ? OnlineExecute(message, params)).mapTo[String]
+    implicit val futureTimeout = GenericHttpAPI.onlineActionTimeout
+    (GenericHttpAPI.engineFSM ? OnlineExecute(message, params)).mapTo[String]
   }
 
   def reload(actionName: String, actionType:String, protocol: String): String = {

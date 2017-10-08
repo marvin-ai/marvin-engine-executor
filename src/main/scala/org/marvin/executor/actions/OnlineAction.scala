@@ -56,7 +56,7 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
       }
 
       Future.sequence(futures).onComplete { response =>
-        onlineActionProxy ! Reload(protocol)
+        onlineActionProxy forward Reload(protocol)
       }
 
     case OnlineHealthCheck =>
