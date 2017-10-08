@@ -37,12 +37,11 @@ after_success:
 
 deploy:
   provider: s3
-  access_key_id: AKIAIGDA5NR4YTYYJLNA
-  secret_access_key:
-    secure: ohpChnuIkF0WZVme0o5e4TaWNRly1RBLBmBoEnchKnxAE0EgiFh45549FMYAp+dyaQVrZxpKGMScRJQ6ml4webFWsWh+5j6OAUHjQ33OjAW3ETrW4vpBqnjEXIwqwWdOonfVjL9SXAqFoKby/YJ6w2K17a1yudp+7Dq1QdQIcfRjcOHkQHHMBztRBMdJ2gAw751lOm2+SOMBKRc0o5Yub8qeA7HBmHdwTT4kv0M8Jy18mrbYIQXoqT8kqFa3dret5Bb0ebvPJC0/bKrZ8znt4bTe+vzDJJEaM3rrutEYo9kVTECHCArvqKAm29FYCvbqU7/Ksl+pwNedmaC9v7v4jlwJ6OfIuTnTfBxAeBgsxaxpUNr00tumUXnoDf2ZNbi4Uc0IChSarNeXJ5KacD2wZxM3cRGFaqaQ4yVjOCiWMhNgAml1X0TgK/I3ersu6M9VSWQ+d3VYdf4XmV701qvkciSY+fMvOPjdrUJBAXsI1oOrQ8m9phPDZtlfJc9q/iFtt+MwuqOd9U/eKLDxvTvg9gSaLxd3Rr9It4+xhZVOoDZYAX5pnVPpK7DcjFrwXbfU4KC7AYZIHeMcBeoBgaRzR0vn2cI6pn7PE5+kMyjDQrU8sao/XdxA/eS4QuNVS5kpsFw7e6fpmo85fUng0XgF8l3NzkS1juU820N5GsgeDhQ=
+  access_key_id: $AWS_SECRET_KEY_ID
+  secret_access_key: $AWS_SECRET_ACCESS_KEY
   bucket: marvin-engine-executor
   local-dir: target/scala-2.12/marvin-engine-executor-assembly-0.0.1.jar
   acl: ''
   on:
     repo: marvin-ai/marvin-engine-executor
-    branch: master
+    branch: tk_travis_configuration
