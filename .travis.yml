@@ -1,5 +1,21 @@
+# Copyright [2017] [B2W Digital]
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 language: scala
+
 scala: 2.12.3
+
 jdk: oraclejdk8
 
 cache:
@@ -8,14 +24,25 @@ cache:
   - $HOME/.m2
 
 before_cache:
-  - find $HOME/.ivy2 -name \"ivydata-*.properties\" -delete
-  - find $HOME/.sbt -name \"*.lock\" -delete
+- find $HOME/.ivy2 -name \"ivydata-*.properties\" -delete
+- find $HOME/.sbt -name \"*.lock\" -delete
 
 before_script:
-  - unset SBT_OPTS
+- unset SBT_OPTS
 
-script:
-  sbt/sbt ++$TRAVIS_SCALA_VERSION coverage test coverageReport
+script: sbt/sbt ++$TRAVIS_SCALA_VERSION coverage test coverageReport
 
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+- bash <(curl -s https://codecov.io/bash)
+
+deploy:
+  provider: s3
+  access_key_id: AKIAIGDA5NR4YTYYJLNA
+  secret_access_key:
+    secure: ohpChnuIkF0WZVme0o5e4TaWNRly1RBLBmBoEnchKnxAE0EgiFh45549FMYAp+dyaQVrZxpKGMScRJQ6ml4webFWsWh+5j6OAUHjQ33OjAW3ETrW4vpBqnjEXIwqwWdOonfVjL9SXAqFoKby/YJ6w2K17a1yudp+7Dq1QdQIcfRjcOHkQHHMBztRBMdJ2gAw751lOm2+SOMBKRc0o5Yub8qeA7HBmHdwTT4kv0M8Jy18mrbYIQXoqT8kqFa3dret5Bb0ebvPJC0/bKrZ8znt4bTe+vzDJJEaM3rrutEYo9kVTECHCArvqKAm29FYCvbqU7/Ksl+pwNedmaC9v7v4jlwJ6OfIuTnTfBxAeBgsxaxpUNr00tumUXnoDf2ZNbi4Uc0IChSarNeXJ5KacD2wZxM3cRGFaqaQ4yVjOCiWMhNgAml1X0TgK/I3ersu6M9VSWQ+d3VYdf4XmV701qvkciSY+fMvOPjdrUJBAXsI1oOrQ8m9phPDZtlfJc9q/iFtt+MwuqOd9U/eKLDxvTvg9gSaLxd3Rr9It4+xhZVOoDZYAX5pnVPpK7DcjFrwXbfU4KC7AYZIHeMcBeoBgaRzR0vn2cI6pn7PE5+kMyjDQrU8sao/XdxA/eS4QuNVS5kpsFw7e6fpmo85fUng0XgF8l3NzkS1juU820N5GsgeDhQ=
+  bucket: marvin-engine-executor
+  local-dir: target/scala-2.12/marvin-engine-executor-assembly-0.0.1.jar
+  acl: ''
+  on:
+    repo: marvin-ai/marvin-engine-executor
+    branch: master
