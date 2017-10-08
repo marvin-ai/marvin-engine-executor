@@ -42,10 +42,11 @@ deploy:
   provider: s3
   access_key_id: $AWS_SECRET_KEY_ID
   secret_access_key: $AWS_SECRET_ACCESS_KEY
-  bucket: o-1ludjfnzke/marvin-engine-executor
+  bucket: marvin-engine-executor
   local_dir: target/scala-2.12/
   acl: public_read
   skip_cleanup: true
+  region: us-east-1
   on:
     repo: marvin-ai/marvin-engine-executor
     branch: tk_travis_configuration
