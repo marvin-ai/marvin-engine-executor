@@ -49,4 +49,4 @@ deploy:
   region: us-east-1
   on:
     repo: marvin-ai/marvin-engine-executor
-    branch: tk_travis_configuration
+    branch: disabled
