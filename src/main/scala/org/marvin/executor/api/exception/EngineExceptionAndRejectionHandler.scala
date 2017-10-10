@@ -19,6 +19,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{ExceptionHandler, MissingQueryParamRejection, RejectionHandler}
 import grizzled.slf4j.Logger
+import org.marvin.model.MarvinEExecutorException
 import spray.json.DefaultJsonProtocol._
 
 import scala.concurrent.TimeoutException
@@ -42,6 +43,11 @@ object EngineExceptionAndRejectionHandler {
         logger.debug("Endpoint thrown timeout exception", ex)
         val error = ErrorResponse(errorMessage = "The engine was not able to provide a response within the specified timeout.")
         complete(HttpResponse(StatusCodes.InternalServerError, entity = toResponseEntityJson(error)))
+      }
+      case ex: MarvinEExecutorException => {
+        logger.debug("Endpoint thrown Marvin EExecutor Exception", ex)
+        val error = ErrorResponse(errorMessage = ex.getMessage())
+        complete(HttpResponse(StatusCodes.ServiceUnavailable, entity = toResponseEntityJson(error)))
       }
       case _ => {
         val error = ErrorResponse(errorMessage = "Unexpected error.")

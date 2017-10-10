@@ -26,12 +26,13 @@ case class EngineMetadata(name:String,
                           onlineActionTimeout:Int,
                           healthCheckTimeout:Int,
                           reloadTimeout:Int,
+                          reloadStateTimeout: Option[Int],
                           batchActionTimeout:Int,
                           hdfsHost:String){
   
   override def toString: String = name
 
-  val artifactsLocalPath:String = sys.env("MARVIN_DATA_PATH").mkString.concat( "/.artifacts")
+  val artifactsLocalPath:String = sys.env.getOrElse("MARVIN_DATA_PATH", "/tmp").mkString.concat( "/.artifacts")
 
   val actionsMap:Map[String, EngineActionMetadata] = {
     val map = Map[String, EngineActionMetadata]()

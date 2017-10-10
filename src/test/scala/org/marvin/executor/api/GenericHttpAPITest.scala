@@ -41,7 +41,7 @@ class GenericHttpAPITest extends WordSpec with ScalatestRouteTest with Matchers 
     "interpret the input message and respond with media type json" in {
 
       val probe = setupProbe()
-      GenericHttpAPI.predictorActor = probe.ref
+      GenericHttpAPI.predictorFSM = probe.ref
 
       val result = Post("/predictor", HttpEntity(`application/json`, s"""{"params":"testParams","message":"testQuery"}""")) ~> route ~> runRoute
 
@@ -65,7 +65,7 @@ class GenericHttpAPITest extends WordSpec with ScalatestRouteTest with Matchers 
 
     "use default params when no params is informed" in {
       val probe = setupProbe()
-      GenericHttpAPI.predictorActor = probe.ref
+      GenericHttpAPI.predictorFSM = probe.ref
       GenericHttpAPI.defaultParams = "default for test"
 
       val result = Post("/predictor", HttpEntity(`application/json`, s"""{"message":"testQuery"}""")) ~> route ~> runRoute
@@ -82,7 +82,7 @@ class GenericHttpAPITest extends WordSpec with ScalatestRouteTest with Matchers 
 
     "fail fast when the timeout is reached" in {
       val probe = setupProbe()
-      GenericHttpAPI.predictorActor = probe.ref
+      GenericHttpAPI.predictorFSM = probe.ref
       GenericHttpAPI.onlineActionTimeout = Timeout(50 millis)
 
       val result = Post("/predictor", HttpEntity(`application/json`, s"""{"params":"testParams","message":"testQuery"}""")) ~> route ~> runRoute

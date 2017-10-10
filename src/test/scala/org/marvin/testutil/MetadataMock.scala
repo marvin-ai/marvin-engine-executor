@@ -13,28 +13,27 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
   */
-package org.marvin.executor.proxies
+package org.marvin.testutil
 
-import akka.actor.{Actor, ActorLogging}
-import org.marvin.model.EngineActionMetadata
+import org.marvin.model.EngineMetadata
 
-object EngineProxy {
-  case class ExecuteBatch(protocol:String, params:String)
-  case class ExecuteOnline(message:String, params:String)
-  case class Reload(protocol:String)
-  case class HealthCheck()
+object MetadataMock {
+
+  def simpleMockedMetadata(): EngineMetadata = {
+    EngineMetadata(
+      name = "test",
+      actions = null,
+      artifactsRemotePath = "",
+      batchActionTimeout = 100,
+      engineType = "python",
+      hdfsHost = "",
+      healthCheckTimeout = 100,
+      onlineActionTimeout = 100,
+      pipelineActions = null,
+      reloadStateTimeout = Some(100),
+      reloadTimeout = 100,
+      version = "1"
+    )
+  }
+
 }
-
-abstract class EngineProxy(metadata: EngineActionMetadata) extends Actor with ActorLogging {
-  var artifacts: String = _
-}
-
-
-
-
-
-
-
-
-
-

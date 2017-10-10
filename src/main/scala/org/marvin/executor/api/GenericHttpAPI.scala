@@ -42,7 +42,7 @@ import org.marvin.executor.actions.{OnlineAction, PipelineAction}
 import org.marvin.executor.actions.BatchAction.{BatchExecute, BatchHealthCheck, BatchReload}
 import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload}
 import org.marvin.executor.actions.PipelineAction.PipelineExecute
-import org.marvin.executor.statemachine.{EngineFSM, Reload}
+import org.marvin.executor.statemachine.{PredictorFSM, Reload, ReloadNoSave}
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
@@ -63,8 +63,7 @@ object GenericHttpAPI extends HttpMarvinApp {
   var protocolUtil = new ProtocolUtil()
 
   var actors:Map[String, ActorRef] = _
-  var predictorActor: ActorRef = _
-  var engineFSM: ActorRef = _
+  var predictorFSM: ActorRef = _
   var acquisitorActor: ActorRef = _
   var tpreparatorActor: ActorRef = _
   var trainerActor: ActorRef = _
@@ -92,7 +91,10 @@ object GenericHttpAPI extends HttpMarvinApp {
               onComplete(api.toHttpEngineResponseFuture(response_message)){ response =>
                 response match{
                   case Success(httpEngineResponse) => complete(httpEngineResponse)
-                  case Failure(e) => throw e
+                  case Failure(e) => {
+                    log.info("RECEIVE FAILURE!!! "+e.getMessage + e.getClass)
+                    throw e
+                  }
                 }
               }
             }
@@ -244,20 +246,22 @@ trait GenericHttpAPI {
     var totalPipelineTimeout = (metadata.reloadTimeout + metadata.batchActionTimeout) * metadata.pipelineActions.length * 1.20
     GenericHttpAPI.pipelineTimeout = Timeout(totalPipelineTimeout milliseconds)
 
-    GenericHttpAPI.predictorActor = system.actorOf(Props(new OnlineAction("predictor", metadata)), name = "predictorActor")
     GenericHttpAPI.acquisitorActor = system.actorOf(Props(new BatchAction("acquisitor", metadata)), name = "acquisitorActor")
     GenericHttpAPI.tpreparatorActor = system.actorOf(Props(new BatchAction("tpreparator", metadata)), name = "tpreparatorActor")
     GenericHttpAPI.trainerActor = system.actorOf(Props(new BatchAction("trainer", metadata)), name = "trainerActor")
     GenericHttpAPI.evaluatorActor = system.actorOf(Props(new BatchAction("evaluator", metadata)), name = "evaluatorActor")
     GenericHttpAPI.pipelineActor = system.actorOf(Props(new PipelineAction(metadata)), name = "pipelineActor")
-    GenericHttpAPI.engineFSM = system.actorOf(Props(new EngineFSM(GenericHttpAPI.predictorActor)), name = "engineFsm")
+    GenericHttpAPI.predictorFSM = system.actorOf(Props(new PredictorFSM()), name = "predictorFSM")
 
     if(!metadata.actionsMap.get("predictor").isEmpty){
-      GenericHttpAPI.engineFSM ! Reload(modelProtocol)
+      modelProtocol match {
+        case "" => GenericHttpAPI.predictorFSM ! ReloadNoSave(modelProtocol)
+        case _ => GenericHttpAPI.predictorFSM ! Reload(modelProtocol)
+      }
     }
 
     GenericHttpAPI.actors = Map[String, ActorRef](
-      "predictor" -> GenericHttpAPI.predictorActor,
+      "predictor" -> GenericHttpAPI.predictorFSM,
       "acquisitor" -> GenericHttpAPI.acquisitorActor,
       "tpreparator" -> GenericHttpAPI.tpreparatorActor,
       "trainer" -> GenericHttpAPI.trainerActor,
@@ -306,7 +310,7 @@ trait GenericHttpAPI {
     GenericHttpAPI.log.info(s"Request for $actionName] received.")
     implicit val ec = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
     implicit val futureTimeout = GenericHttpAPI.onlineActionTimeout
-    (GenericHttpAPI.engineFSM ? OnlineExecute(message, params)).mapTo[String]
+    (GenericHttpAPI.actors(actionName) ? OnlineExecute(message, params)).mapTo[String]
   }
 
   def reload(actionName: String, actionType:String, protocol: String): String = {
