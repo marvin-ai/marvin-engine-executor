@@ -1,25 +1,25 @@
-/**
-  * Copyright [2017] [B2W Digital]
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-  */
+/*
+ * Copyright [2017] [B2W Digital]
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package org.marvin.executor.api
 
 import java.io.FileNotFoundException
 import java.util.concurrent.Executors
 
 import actions.HealthCheckResponse.Status
-import akka.actor.FSM.Event
 import akka.actor.{ActorRef, ActorSystem, Props, Terminated}
 import akka.event.LoggingAdapter
 import akka.event.Logging
@@ -29,7 +29,7 @@ import akka.util.Timeout
 import org.marvin.util.{ConfigurationContext, JsonUtil, ProtocolUtil}
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.model._
-import org.marvin.executor.actions.{BatchAction, OnlineAction, PipelineAction}
+import org.marvin.executor.actions.{BatchAction, PipelineAction}
 
 import scala.concurrent._
 import scala.io.Source
@@ -38,7 +38,6 @@ import org.marvin.executor.api.exception.EngineExceptionAndRejectionHandler._
 import spray.json.DefaultJsonProtocol._
 import org.marvin.executor.api.model.HealthStatus
 import org.marvin.model.{EngineMetadata, MarvinEExecutorException}
-import org.marvin.executor.actions.{OnlineAction, PipelineAction}
 import org.marvin.executor.actions.BatchAction.{BatchExecute, BatchHealthCheck, BatchReload}
 import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload}
 import org.marvin.executor.actions.PipelineAction.PipelineExecute
@@ -243,7 +242,7 @@ trait GenericHttpAPI {
     GenericHttpAPI.batchActionTimeout = Timeout(metadata.batchActionTimeout millisecond)
     GenericHttpAPI.reloadTimeout = Timeout(metadata.reloadTimeout millisecond)
 
-    var totalPipelineTimeout = (metadata.reloadTimeout + metadata.batchActionTimeout) * metadata.pipelineActions.length * 1.20
+    val totalPipelineTimeout = (metadata.reloadTimeout + metadata.batchActionTimeout) * metadata.pipelineActions.length * 1.20
     GenericHttpAPI.pipelineTimeout = Timeout(totalPipelineTimeout milliseconds)
 
     GenericHttpAPI.acquisitorActor = system.actorOf(Props(new BatchAction("acquisitor", metadata)), name = "acquisitorActor")
@@ -251,7 +250,7 @@ trait GenericHttpAPI {
     GenericHttpAPI.trainerActor = system.actorOf(Props(new BatchAction("trainer", metadata)), name = "trainerActor")
     GenericHttpAPI.evaluatorActor = system.actorOf(Props(new BatchAction("evaluator", metadata)), name = "evaluatorActor")
     GenericHttpAPI.pipelineActor = system.actorOf(Props(new PipelineAction(metadata)), name = "pipelineActor")
-    GenericHttpAPI.predictorFSM = system.actorOf(Props(new PredictorFSM()), name = "predictorFSM")
+    GenericHttpAPI.predictorFSM = system.actorOf(Props(new PredictorFSM(metadata)), name = "predictorFSM")
 
     if(!metadata.actionsMap.get("predictor").isEmpty){
       modelProtocol match {
