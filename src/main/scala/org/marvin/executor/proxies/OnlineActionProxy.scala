@@ -16,41 +16,60 @@
  */
 package org.marvin.executor.proxies
 
-import actions.OnlineActionHandlerGrpc.OnlineActionHandlerBlockingStub
+import actions.OnlineActionHandlerGrpc.{OnlineActionHandlerBlockingStub, OnlineActionHandlerStub}
 import actions._
-import akka.actor.FSM.Event
+import akka.pattern.pipe
 import io.grpc.ManagedChannelBuilder
 import org.marvin.model.EngineActionMetadata
 import org.marvin.executor.proxies.EngineProxy.{ExecuteOnline, HealthCheck, Reload}
 import org.marvin.executor.statemachine.{Model, Reloaded}
 
+import scala.util.{Failure, Success}
+
 class OnlineActionProxy(metadata: EngineActionMetadata) extends EngineProxy (metadata)  {
-  var engineClient:OnlineActionHandlerBlockingStub = _
+  var engineClient:OnlineActionHandlerStub = _
+  implicit val ec = context.dispatcher
 
   override def preStart() = {
     log.info(s"${this.getClass().getCanonicalName} actor initialized...")
     val channel = ManagedChannelBuilder.forAddress(metadata.host, metadata.port).usePlaintext(true).build
     artifacts = metadata.artifactsToLoad.mkString(",")
-    engineClient = OnlineActionHandlerGrpc.blockingStub(channel)
+    //engineClient = OnlineActionHandlerGrpc.blockingStub(channel)
+    engineClient = OnlineActionHandlerGrpc.stub(channel)
   }
 
   override def receive = {
     case ExecuteOnline(requestMessage, params) =>
       log.info(s"Start the execute remote procedure to ${metadata.name}.")
-      val response_message = engineClient.RemoteExecute(OnlineActionRequest(message=requestMessage, params=params)).message
-      log.info(s"Execute remote procedure to ${metadata.name} Done with [${response_message}].")
-      sender ! response_message
+      val responseFuture = engineClient.RemoteExecute(OnlineActionRequest(message=requestMessage, params=params))
+
+      responseFuture.collect{case response => response.message} pipeTo sender
+      /*responseFuture.onComplete{
+        case Success(response) =>
+          log.info(s"Execute remote procedure to ${metadata.name} Done with [${response}].")
+          sender ! response
+
+        case Failure(ex) =>
+          sender ! akka.actor.Status.Failure(ex)
+      }*/
 
     case HealthCheck =>
       log.info(s"Start the health check remote procedure to ${metadata.name}.")
-      val status = engineClient.HealthCheck(HealthCheckRequest(artifacts=artifacts)).status
-      log.info(s"Health check remote procedure to ${metadata.name} Done with [${status}].")
-      sender ! status
+      val statusFuture = engineClient.HealthCheck(HealthCheckRequest(artifacts=artifacts))
+
+      statusFuture.onComplete{
+        case Success(status) =>
+          log.info(s"Health check remote procedure to ${metadata.name} Done with [${status}].")
+          sender ! status
+        case Failure(ex) =>
+          sender ! akka.actor.Status.Failure(ex)
+      }
+      sender ! statusFuture
 
     case Reload(protocol) =>
       log.info(s"Start the reload remote procedure to ${metadata.name}. Protocol [$protocol]")
-      val message = engineClient.RemoteReload(ReloadRequest(artifacts=artifacts, protocol=protocol)).message
-      log.info(s"Reload remote procedure to ${metadata.name} Done with [${message}]. Protocol [$protocol]")
+      val message = engineClient.RemoteReload(ReloadRequest(artifacts=artifacts, protocol=protocol))
+      //log.info(s"Reload remote procedure to ${metadata.name} Done with [${message}]. Protocol [$protocol]")
       sender ! Reloaded(protocol)
 
     case _ =>
