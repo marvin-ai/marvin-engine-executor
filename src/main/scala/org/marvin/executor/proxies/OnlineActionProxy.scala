@@ -22,35 +22,37 @@ import akka.pattern.pipe
 import io.grpc.ManagedChannelBuilder
 import org.marvin.model.EngineActionMetadata
 import org.marvin.executor.proxies.EngineProxy.{ExecuteOnline, HealthCheck, Reload}
-import org.marvin.executor.statemachine.{Model, Reloaded}
-
-import scala.util.{Failure, Success}
+import org.marvin.executor.statemachine.Reloaded
 
 class OnlineActionProxy(metadata: EngineActionMetadata) extends EngineProxy (metadata)  {
-  var engineClient:OnlineActionHandlerStub = _
+  var engineAsyncClient:OnlineActionHandlerStub = _
+  var engineClient:OnlineActionHandlerBlockingStub = _
+
   implicit val ec = context.dispatcher
 
   override def preStart() = {
     log.info(s"${this.getClass().getCanonicalName} actor initialized...")
     val channel = ManagedChannelBuilder.forAddress(metadata.host, metadata.port).usePlaintext(true).build
     artifacts = metadata.artifactsToLoad.mkString(",")
-    engineClient = OnlineActionHandlerGrpc.stub(channel)
+    engineAsyncClient = OnlineActionHandlerGrpc.stub(channel)
+    engineClient = OnlineActionHandlerGrpc.blockingStub(channel)
   }
 
   override def receive = {
     case ExecuteOnline(requestMessage, params) =>
       log.info(s"Start the execute remote procedure to ${metadata.name}.")
-      val responseFuture = engineClient.RemoteExecute(OnlineActionRequest(message=requestMessage, params=params))
+      val responseFuture = engineAsyncClient.RemoteExecute(OnlineActionRequest(message=requestMessage, params=params))
       responseFuture.collect{case response => response.message} pipeTo sender
 
     case HealthCheck =>
       log.info(s"Start the health check remote procedure to ${metadata.name}.")
-      val statusFuture = engineClient.HealthCheck(HealthCheckRequest(artifacts=artifacts))
+      val statusFuture = engineAsyncClient.HealthCheck(HealthCheckRequest(artifacts=artifacts))
       statusFuture.collect{case response => response.status} pipeTo sender
 
     case Reload(protocol) =>
       log.info(s"Start the reload remote procedure to ${metadata.name}. Protocol [$protocol]")
-      val message = engineClient.RemoteReload(ReloadRequest(artifacts=artifacts, protocol=protocol))
+      val message = engineClient.RemoteReload(ReloadRequest(artifacts=artifacts, protocol=protocol)).message
+      log.info(s"Reload remote procedure to ${metadata.name} Done with [${message}]. Protocol [$protocol]")
       sender ! Reloaded(protocol)
 
     case _ =>
