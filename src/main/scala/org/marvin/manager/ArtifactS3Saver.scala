@@ -23,39 +23,29 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.marvin.manager.ArtifactSaver.{SaveToLocal, SaveToRemote}
 import org.marvin.model.EngineMetadata
+import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.auth.BasicAWSCredentials
 
 class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging {
+
   var conf: Configuration = _
 
-  override def preStart() = {
-    log.info(s"${this.getClass().getCanonicalName} actor initialized...")
-    conf = new Configuration()
+  val bucketName = "marvin-artifact-bucket"
+  val fileToUpload = new File("/home/zhang/Documentos/oi.properties")
+  val AWS_ACCESS_KEY = "AKIAJLRQ2FXQRDW7FRLA"
+  val AWS_SECRET_KEY = "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"
+  val AWSCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  val S3Client = new AmazonS3Client(AWSCredentials)
 
-    if (sys.env.get("HADOOP_CONF_DIR") != None){
-      val confFiles:List[File] = getListOfFiles(sys.env.get("HADOOP_CONF_DIR").mkString)
+  S3Client.putObject(bucketName, "artifact", fileToUpload)
 
-      for(file <- confFiles){
-        log.info(s"Loading ${file.getAbsolutePath} file to hdfs client configuration ..")
-        conf.addResource(new FileInputStream(file))
-      }
-    }
-
-    conf.set("fs.defaultFS", metadata.hdfsHost)
-  }
+  val fileToSave = S3Client.getObject(bucketName, "artifact")
 
   def generatePaths(artifactName: String, protocol: String): Map[String, Path] = {
     Map(
       "localPath" -> new Path(s"${metadata.artifactsLocalPath}/${metadata.name}/$artifactName"),
       "remotePath" -> new Path(s"${metadata.artifactsRemotePath}/${metadata.name}/${metadata.version}/$artifactName/$protocol")
     )
-  }
-
-  def getListOfFiles(path: String): List[File] = {
-    val dir = new File(path)
-    val extensions = List("xml")
-    dir.listFiles.filter(_.isFile).toList.filter { file =>
-      extensions.exists(file.getName.endsWith(_))
-    }
   }
 
   override def receive: Receive = {
