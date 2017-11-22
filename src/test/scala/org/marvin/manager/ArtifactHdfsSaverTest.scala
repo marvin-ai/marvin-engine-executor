@@ -26,7 +26,7 @@ import org.marvin.manager.ArtifactSaver.{SaveToLocal, SaveToRemote}
 import org.marvin.model.EngineMetadata
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
-class ArtifactSaverTest extends TestKit(ActorSystem("MySpec")) with ImplicitSender
+class ArtifactHdfsSaverTest extends TestKit(ActorSystem("MySpec")) with ImplicitSender
   with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   override def afterAll {
