@@ -16,15 +16,18 @@
  */
 package org.marvin.manager
 
-import java.io.{File, FileInputStream}
-import akka.Done
-import akka.actor.{Actor, ActorLogging}
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.marvin.manager.ArtifactSaver.{SaveToLocal, SaveToRemote}
-import org.marvin.model.EngineMetadata
+import akka.actor.Props
+import org.marvin.model.{EngineMetadata, MarvinEExecutorException}
 
 object ArtifactSaver {
   case class SaveToLocal(artifactName: String, protocol:String)
   case class SaveToRemote(artifactName: String, protocol:String)
+
+  def build(metadata: EngineMetadata): Props = {
+    metadata.artifactManagerType.toUpperCase match {
+      case "HDFS" => return Props(new ArtifactHdfsSaver(metadata))
+      case "S3" => return Props(new ArtifactS3Saver(metadata))
+      case _ => throw new MarvinEExecutorException(s"Can not recognize ArtifactManagerType from EngineMetadata")
+    }
+  }
 }

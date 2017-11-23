@@ -23,6 +23,7 @@ import akka.util.Timeout
 import org.marvin.executor.actions.BatchAction.{BatchExecute, BatchHealthCheck, BatchReload}
 import org.marvin.executor.proxies.BatchActionProxy
 import org.marvin.executor.proxies.EngineProxy.{ExecuteBatch, HealthCheck, Reload}
+import org.marvin.manager.ArtifactSaver
 import org.marvin.manager.ArtifactSaver.{SaveToLocal, SaveToRemote}
 import org.marvin.model.{EngineActionMetadata, EngineMetadata}
 
@@ -48,7 +49,7 @@ class BatchAction(actionName: String, metadata: EngineMetadata) extends Actor wi
     engineActionMetadata = metadata.actionsMap(actionName)
     artifactsToLoad = engineActionMetadata.artifactsToLoad.mkString(",")
     batchActionProxy = context.actorOf(Props(new BatchActionProxy(engineActionMetadata)), name = "batchActionProxy")
-    artifactSaver = context.actorOf(new ArtifactSaverFactory(metadata).Selector, name = "artifactSaver")
+    artifactSaver = context.actorOf(ArtifactSaver.build(metadata), name = "artifactSaver")
   }
 
   override def receive  = {

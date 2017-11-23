@@ -46,6 +46,7 @@ libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.232"
 
 dependencyOverrides ++= Set(
   "io.netty" %% "netty" % "3.7.0",
+  "io.netty" %% "netty-handler-proxy" % "4.1.12.Final",
   "com.google.guava" %% "guava" % "19.0"
 )
 

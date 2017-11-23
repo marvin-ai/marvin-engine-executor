@@ -50,7 +50,7 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
     engineActionMetadata = metadata.actionsMap(actionName)
     artifactsToLoad = engineActionMetadata.artifactsToLoad.mkString(",")
     onlineActionProxy = context.actorOf(Props(new OnlineActionProxy(engineActionMetadata)), name = "onlineActionProxy")
-    artifactSaver = context.actorOf(new ArtifactSaverFactory(metadata).Selector, name = "artifactSaver")
+    artifactSaver = context.actorOf(ArtifactSaver.build(metadata), name = "artifactSaver")
   }
 
   override def receive  = {

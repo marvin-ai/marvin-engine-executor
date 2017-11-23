@@ -20,23 +20,32 @@ import java.io.File
 
 import akka.Done
 import akka.actor.{Actor, ActorLogging}
-import com.amazonaws.services.s3.AmazonS3ClientBuilder
+import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.amazonaws.services.s3.model.GetObjectRequest
 import org.apache.hadoop.fs.Path
 import org.marvin.manager.ArtifactSaver.{SaveToLocal, SaveToRemote}
 import org.marvin.model.EngineMetadata
 
 class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging {
+  var S3Client: AmazonS3 = _
 
-  val bucketName = "marvin-artifact-bucket"
+  override def preStart() = {
+    log.info(s"${this.getClass().getCanonicalName} actor initialized...")
 
-  /** Create S3 Client with default credential informations(Environment Variable)*/
-  val S3Client = AmazonS3ClientBuilder.standard.withRegion("sa-east-1").build
+    //Create S3 Client with default credential informations(Environment Variable)
+    S3Client = AmazonS3ClientBuilder.standard.withRegion("sa-east-1").build
+
+    log.info("Amazon S3 client initialized...")
+  }
 
   def generatePaths(artifactName: String, protocol: String): Map[String, Path] = {
+    var artifactsRemotePath: String = null
+    if(metadata.artifactsRemotePath.startsWith("/")){
+      artifactsRemotePath = metadata.artifactsRemotePath.substring(1)
+    }
     Map(
       "localPath" -> new Path(s"${metadata.artifactsLocalPath}/${metadata.name}/$artifactName"),
-      "remotePath" -> new Path(s"${metadata.artifactsRemotePath}/${metadata.name}/${metadata.version}/$artifactName/$protocol")
+      "remotePath" -> new Path(s"${artifactsRemotePath}/${metadata.name}/${metadata.version}/$artifactName/$protocol")
     )
   }
 
@@ -46,10 +55,10 @@ class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging 
       val uris = generatePaths(artifactName, protocol)
       val localToSave = new File(uris("localPath").toString)
 
-      log.info(s"Copying files from ${uris("remotePath")} to ${uris("localPath")}")
+      log.info(s"Copying files from ${metadata.s3BucketName}: ${uris("remotePath")} to ${uris("localPath")}")
 
-      /** Get artifact named "uris("remotePath")" from S3 Bucket and save to local */
-      S3Client.getObject(new GetObjectRequest(bucketName, uris("remotePath").toString), localToSave)
+      //Get artifact named "uris("remotePath")" from S3 Bucket and save to local
+      S3Client.getObject(new GetObjectRequest(metadata.s3BucketName, uris("remotePath").toString), localToSave)
 
       log.info(s"File ${uris("localPath")} saved!")
 
@@ -60,10 +69,10 @@ class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging 
       val uris = generatePaths(artifactName, protocol)
       val fileToUpload = new File(uris("localPath").toString)
 
-      log.info(s"Copying files from ${uris("localPath")} to ${uris("remotePath")}")
+      log.info(s"Copying files from ${uris("localPath")} to ${metadata.s3BucketName}: ${uris("remotePath")}")
 
-      /** Get local artifact and save to S3 Bucket with name "uris("remotePath")" */
-      S3Client.putObject(bucketName, uris("remotePath").toString, fileToUpload)
+      //Get local artifact and save to S3 Bucket with name "uris("remotePath")"
+      S3Client.putObject(metadata.s3BucketName, uris("remotePath").toString, fileToUpload)
 
       log.info(s"File ${uris("localPath")} saved!")
 
