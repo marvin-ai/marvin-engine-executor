@@ -34,7 +34,7 @@ class ArtifactHdfsSaverTest extends TestKit(ActorSystem("MySpec")) with Implicit
   }
 
   val engineMetadata: EngineMetadata = new EngineMetadata("name",
-    "version", "engineType", null, "artifactsRemotePath", null,
+    "version", "engineType", null, "artifactsRemotePath", "HDFS", null,
     3000, 3000, 3000, Option(3000), 3000, "testHost")
 
   val artifactSaver = new ArtifactHdfsSaver(engineMetadata)

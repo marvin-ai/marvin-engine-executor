@@ -27,6 +27,7 @@ object MetadataMock {
         new EngineActionMetadata(name="predictor", actionType="online", port=777, host="localhost", artifactsToPersist=List(), artifactsToLoad=List("model"))
       ),
       artifactsRemotePath = "",
+      artifactsSaverType = "HDFS",
       batchActionTimeout = 100,
       engineType = "python",
       hdfsHost = "",

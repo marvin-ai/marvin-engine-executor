@@ -28,7 +28,7 @@ class ArtifactSaverFactory(metadata: EngineMetadata){
     metadata.artifactsSaverType.toUpperCase match {
       case "HDFS" => saverType = Props(new ArtifactHdfsSaver(metadata))
       case "S3" => saverType = Props(new ArtifactS3Saver(metadata))
-      case _ => println("Invalid Saver Type")
+      case _ => println("Invalid artifactsSaverType")
     }
     saverType
   }
