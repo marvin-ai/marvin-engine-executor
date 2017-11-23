@@ -33,7 +33,7 @@ class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging 
     log.info(s"${this.getClass().getCanonicalName} actor initialized...")
 
     //Create S3 Client with default credential informations(Environment Variable)
-    S3Client = AmazonS3ClientBuilder.standard.withRegion("sa-east-1").build
+    S3Client = AmazonS3ClientBuilder.standard.withRegion(System.getenv("AWS_DEFAULT_REGION")).build
 
     log.info("Amazon S3 client initialized...")
   }
