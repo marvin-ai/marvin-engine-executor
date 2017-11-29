@@ -18,6 +18,10 @@ package org.marvin.util
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import org.everit.json.schema.ValidationException
+import org.everit.json.schema.loader.SchemaLoader
+import org.json.{JSONObject, JSONTokener}
+import org.marvin.model.MarvinEExecutorException
 import spray.json._
 
 import scala.reflect.{ClassTag, _}
@@ -40,7 +44,24 @@ object JsonUtil {
   }
 
   def fromJson[T: ClassTag](jsonString: String): T = {
+    val jsonToValidate: JSONObject = new JSONObject(jsonString)
+
+    validateMetadataJson(jsonToValidate)
+
     jacksonMapper.readValue[T](jsonString, classTag[T].runtimeClass.asInstanceOf[Class[T]])
+  }
+
+  def validateMetadataJson(jsonToValidate: JSONObject) = {
+    val jsonSchema = new JSONObject(new JSONTokener(getClass.getResourceAsStream("/metadataSchema.json")))
+    val schema = SchemaLoader.load(jsonSchema)
+
+    try {
+      schema.validate(jsonToValidate)
+    } catch {
+      case e: ValidationException => println(e.getMessage)
+        e.getCausingExceptions().stream().forEach(println)
+        throw new MarvinEExecutorException(s"Invalid EngineMetadata informations")
+    }
   }
 
   def format(jsonString: String): String ={
