@@ -60,7 +60,7 @@ object JsonUtil {
     } catch {
       case e: ValidationException => println(e.getMessage)
         e.getCausingExceptions().stream().forEach(println)
-        throw new MarvinEExecutorException(s"Invalid EngineMetadata informations")
+        throw e
     }
   }
 

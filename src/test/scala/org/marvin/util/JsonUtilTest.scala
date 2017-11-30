@@ -17,6 +17,8 @@
 package org.marvin.util
 
 import java.io.File
+
+import org.everit.json.schema.ValidationException
 import org.json.JSONObject
 import org.marvin.model.{EngineMetadata, MarvinEExecutorException}
 import org.scalatest.{Matchers, WordSpec}
@@ -26,21 +28,19 @@ import scala.io.Source
 
 class JsonUtilTest extends WordSpec with Matchers {
 
-  val testFilePath = new File(getClass.getClassLoader.getResource("metadataToValidate.json").getPath)
-  val jsonToValidate = new JSONObject(Source.fromFile(testFilePath).mkString)
-
-  val errorTestFilePath = new File(getClass.getClassLoader.getResource("metadataToValidateWithError.json").getPath)
-  val errorJsonToValidate = new JSONObject(Source.fromFile(errorTestFilePath).mkString)
-
   "A Metadata validation" should {
     "return Unit if metadataToValidate is valid" in {
+      val testFilePath = new File(getClass.getClassLoader.getResource("metadataToValidate.json").getPath)
+      val jsonToValidate = new JSONObject(Source.fromFile(testFilePath).mkString)
       assert { JsonUtil.validateMetadataJson(jsonToValidate) == () }
     }
   }
 
   "A Metadata validation" should {
     "throw Exception if metadataToValidate is invalid" in {
-      assertThrows[MarvinEExecutorException] {
+      assertThrows[ValidationException] {
+        val errorTestFilePath = new File(getClass.getClassLoader.getResource("metadataToValidateWithError.json").getPath)
+        val errorJsonToValidate = new JSONObject(Source.fromFile(errorTestFilePath).mkString)
         JsonUtil.validateMetadataJson(errorJsonToValidate)
       }
     }
@@ -48,6 +48,7 @@ class JsonUtilTest extends WordSpec with Matchers {
 
   "A JsonUtil.fromJson method" should {
     "return Engine name (iris_species)" in {
+      val testFilePath = new File(getClass.getClassLoader.getResource("metadataToValidate.json").getPath)
       assert { JsonUtil.fromJson[EngineMetadata](Source.fromFile(testFilePath).mkString).toString == "iris_species"}
     }
   }
