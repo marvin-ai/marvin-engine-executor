@@ -27,21 +27,21 @@ class ProtocolUtil {
     s"${actionName}_${UUID.randomString}"
   }
 
-  def split_protocol(protocol: String, metadata: EngineMetadata): HashMap[String, String] = {
-    var splited_protocols = new HashMap[String, String]()
+  def splitProtocol(protocol: String, metadata: EngineMetadata): HashMap[String, String] = {
+    var splitedProtocols = new HashMap[String, String]()
 
     for (_p <- protocol.split(",")){
       val _action = _p.substring(0, _p.indexOf("_"))
 
       if (_action != "pipeline") {
-        for (_artifact <- metadata.actionsMap(_action).artifactsToPersist) splited_protocols += (_artifact -> _p)
+        for (_artifact <- metadata.actionsMap(_action).artifactsToPersist) splitedProtocols += (_artifact -> _p)
       }
       else{
-        for (_paction <- metadata.pipelineActions) for (_artifact <- metadata.actionsMap(_paction).artifactsToPersist) splited_protocols += (_artifact -> _p)
+        for (_paction <- metadata.pipelineActions) for (_artifact <- metadata.actionsMap(_paction).artifactsToPersist) splitedProtocols += (_artifact -> _p)
       }
     }
 
-    splited_protocols
+    splitedProtocols
   }
 
 }

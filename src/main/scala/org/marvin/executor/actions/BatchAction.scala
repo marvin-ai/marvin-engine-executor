@@ -79,7 +79,7 @@ class BatchAction(actionName: String, metadata: EngineMetadata) extends Actor wi
 
       log.info(s"Starting to process reload to $actionName. Protocol: [$protocol].")
 
-      val splitedProtocols = protocolUtil.split_protocol(protocol, metadata)
+      val splitedProtocols = protocolUtil.splitProtocol(protocol, metadata)
 
       val futures:ListBuffer[Future[Any]] = ListBuffer[Future[Any]]()
       for(artifactName <- engineActionMetadata.artifactsToLoad) {
