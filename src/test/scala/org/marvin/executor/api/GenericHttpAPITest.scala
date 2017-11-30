@@ -609,13 +609,13 @@ class GenericHttpAPITest extends WordSpec with ScalatestRouteTest with Matchers 
     "throw a friendly exception when params file does not exists" in {
       val httpApi = new GenericHttpAPIOpen(new ProtocolUtil())
 
-      val existentFile = getClass.getResource("/test.json").getPath()
+      val existentFile = getClass.getResource("/metadataToValidate.json").getPath()
 
       val caught =
         intercept[MarvinEExecutorException] {
           httpApi.setupSystem(existentFile, "not_existent_params_file", "")
         }
-      caught.getMessage() shouldEqual "Invalid engine metadata file. Check your engine metadata."
+      caught.getMessage() shouldEqual "The file [not_existent_params_file] does not exists. Check your engine configuration."
     }
 
     "do not throw exception and setup the system when params files are valid" in {

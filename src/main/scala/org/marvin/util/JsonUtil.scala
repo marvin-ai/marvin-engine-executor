@@ -16,17 +16,18 @@
  */
 package org.marvin.util
 
+import akka.event.LoggingAdapter
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.everit.json.schema.ValidationException
 import org.everit.json.schema.loader.SchemaLoader
 import org.json.{JSONObject, JSONTokener}
-import org.marvin.model.MarvinEExecutorException
 import spray.json._
 
 import scala.reflect.{ClassTag, _}
 
 object JsonUtil {
+  var log: LoggingAdapter = _
   val jacksonMapper = new ObjectMapper()
   jacksonMapper.registerModule(DefaultScalaModule)
   jacksonMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -43,24 +44,34 @@ object JsonUtil {
     JsonUtil.fromJson[Map[String, List[Map[String, String]]]](jsonString)
   }
 
-  def fromJson[T: ClassTag](jsonString: String): T = {
-    val jsonToValidate: JSONObject = new JSONObject(jsonString)
+  def fromJson[T: ClassTag](jsonString: String, validate: Boolean = false): T = {
 
-    validateMetadataJson(jsonToValidate)
+    if (validate) validateJson[T](jsonString)
 
     jacksonMapper.readValue[T](jsonString, classTag[T].runtimeClass.asInstanceOf[Class[T]])
   }
 
-  def validateMetadataJson(jsonToValidate: JSONObject) = {
-    val jsonSchema = new JSONObject(new JSONTokener(getClass.getResourceAsStream("/metadataSchema.json")))
+  def validateJson[T: ClassTag](jsonString: String) = {
+    val className = classTag[T].runtimeClass.getSimpleName
+    val schemaName = className.toString + "Schema.json"
+    val jsonToValidate: JSONObject = new JSONObject(jsonString)
+
+    var jsonSchema: JSONObject = new JSONObject()
+
+    try{
+      jsonSchema = new JSONObject(new JSONTokener(getClass.getResourceAsStream(schemaName)))
+    } catch {
+      case e: NullPointerException => log.info(s"File ${schemaName} not found, check your schema file")
+        throw e
+    }
+
     val schema = SchemaLoader.load(jsonSchema)
 
     try {
       schema.validate(jsonToValidate)
     } catch {
-      case e: ValidationException => println(e.getMessage)
+      case e: ValidationException => log.info(e.getMessage)
         e.getCausingExceptions().stream().forEach(println)
-        throw e
     }
   }
 

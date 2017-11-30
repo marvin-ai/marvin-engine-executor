@@ -31,8 +31,7 @@ class JsonUtilTest extends WordSpec with Matchers {
   "A Metadata validation" should {
     "return Unit if metadataToValidate is valid" in {
       val testFilePath = new File(getClass.getClassLoader.getResource("metadataToValidate.json").getPath)
-      val jsonToValidate = new JSONObject(Source.fromFile(testFilePath).mkString)
-      assert { JsonUtil.validateMetadataJson(jsonToValidate) == () }
+      assert { JsonUtil.validateJson(Source.fromFile(testFilePath).mkString) == () }
     }
   }
 
@@ -40,8 +39,7 @@ class JsonUtilTest extends WordSpec with Matchers {
     "throw Exception if metadataToValidate is invalid" in {
       assertThrows[ValidationException] {
         val errorTestFilePath = new File(getClass.getClassLoader.getResource("metadataToValidateWithError.json").getPath)
-        val errorJsonToValidate = new JSONObject(Source.fromFile(errorTestFilePath).mkString)
-        JsonUtil.validateMetadataJson(errorJsonToValidate)
+        JsonUtil.validateJson(Source.fromFile(errorTestFilePath).mkString)
       }
     }
   }
