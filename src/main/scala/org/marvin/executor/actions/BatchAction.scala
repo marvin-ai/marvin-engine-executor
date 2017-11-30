@@ -47,8 +47,6 @@ class BatchAction(actionName: String, metadata: EngineMetadata) extends Actor wi
   implicit val ec = context.dispatcher
   var protocolUtil = new ProtocolUtil()
 
-
-
   override def preStart() = {
     engineActionMetadata = metadata.actionsMap(actionName)
     artifactsToLoad = engineActionMetadata.artifactsToLoad.mkString(",")
