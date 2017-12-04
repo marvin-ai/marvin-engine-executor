@@ -280,7 +280,7 @@ trait GenericHttpAPI {
           case ex: FileNotFoundException => throw new MarvinEExecutorException(s"The file [$filePath] does not exists." +
             s" Check your engine configuration.", ex)
           case ex: ValidationException => throw new MarvinEExecutorException(s"Invalid engine metadata file."  +
-            s" Check your engine metadata.", ex)
+            s" Check your engine metadata file.", ex)
           case _ => throw ex
         }
       }

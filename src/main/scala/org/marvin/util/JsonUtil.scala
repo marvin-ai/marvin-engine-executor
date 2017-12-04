@@ -16,7 +16,6 @@
  */
 package org.marvin.util
 
-import akka.event.LoggingAdapter
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.everit.json.schema.ValidationException
@@ -27,7 +26,6 @@ import spray.json._
 import scala.reflect.{ClassTag, _}
 
 object JsonUtil {
-  var log: LoggingAdapter = _
   val jacksonMapper = new ObjectMapper()
   jacksonMapper.registerModule(DefaultScalaModule)
   jacksonMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -53,7 +51,7 @@ object JsonUtil {
 
   def validateJson[T: ClassTag](jsonString: String) = {
     val className = classTag[T].runtimeClass.getSimpleName
-    val schemaName = className.toString + "Schema.json"
+    val schemaName = "/" + className.toString + "Schema.json"
     val jsonToValidate: JSONObject = new JSONObject(jsonString)
 
     var jsonSchema: JSONObject = new JSONObject()
@@ -61,7 +59,7 @@ object JsonUtil {
     try{
       jsonSchema = new JSONObject(new JSONTokener(getClass.getResourceAsStream(schemaName)))
     } catch {
-      case e: NullPointerException => log.info(s"File ${schemaName} not found, check your schema file")
+      case e: NullPointerException => println(s"File ${schemaName} not found, check your schema file")
         throw e
     }
 
@@ -70,8 +68,10 @@ object JsonUtil {
     try {
       schema.validate(jsonToValidate)
     } catch {
-      case e: ValidationException => log.info(e.getMessage)
-        e.getCausingExceptions().stream().forEach(println)
+      case e: ValidationException =>
+        e.printStackTrace()
+        e.getCausingExceptions.stream().forEach(println)
+        throw e
     }
   }
 
