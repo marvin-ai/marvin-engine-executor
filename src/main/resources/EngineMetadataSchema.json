@@ -31,8 +31,7 @@
       "description": "Pipeline actions",
       "type": "array",
       "items": {
-        "type": "string",
-        "enum": ["acquisitor", "tpreparator", "trainer", "evaluator"]
+        "type": "string"
       },
       "additionalItems": false
     },
