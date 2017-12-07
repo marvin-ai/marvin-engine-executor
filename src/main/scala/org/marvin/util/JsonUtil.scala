@@ -70,6 +70,7 @@ object JsonUtil extends Logging {
       schema.validate(jsonToValidate)
     } catch {
       case e: ValidationException =>
+        e.getCausingExceptions.stream().forEach(println)
         e.printStackTrace()
         throw e
     }
