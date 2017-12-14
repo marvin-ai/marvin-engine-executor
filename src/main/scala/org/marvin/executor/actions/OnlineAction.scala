@@ -31,8 +31,7 @@ import org.marvin.util.ProtocolUtil
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.reflect.ClassTag
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 object OnlineAction {
   case class OnlineExecute(message: String, params: String)
