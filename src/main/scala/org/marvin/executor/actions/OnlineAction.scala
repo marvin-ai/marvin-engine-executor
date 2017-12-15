@@ -17,9 +17,11 @@
 package org.marvin.executor.actions
 
 import akka.Done
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.SupervisorStrategy._
+import akka.actor.{Actor, ActorLogging, ActorRef, OneForOneStrategy, Props}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import io.grpc.StatusRuntimeException
 import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload, OnlineReloadNoSave}
 import org.marvin.manager.ArtifactSaver
 import org.marvin.model.{EngineActionMetadata, EngineMetadata}
@@ -54,6 +56,12 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
     onlineActionProxy = context.actorOf(Props(new OnlineActionProxy(engineActionMetadata)), name = "onlineActionProxy")
     artifactSaver = context.actorOf(ArtifactSaver.build(metadata), name = "artifactSaver")
   }
+
+  override val supervisorStrategy =
+    OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = metadata.onlineActionTimeout milliseconds) {
+      case _: StatusRuntimeException => Restart
+      case _: Exception => Escalate
+    }
 
   override def receive  = {
     case OnlineExecute(message, params) =>
