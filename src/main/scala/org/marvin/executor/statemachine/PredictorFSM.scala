@@ -16,9 +16,10 @@
  */
 package org.marvin.executor.statemachine
 
-import akka.actor.{ActorRef, FSM, Props}
-import scala.concurrent.duration._
+import akka.actor.SupervisorStrategy.{Restart, Stop}
+import akka.actor.{ActorRef, FSM, OneForOneStrategy, Props, SupervisorStrategy}
 
+import scala.concurrent.duration._
 import org.marvin.executor.actions.OnlineAction
 import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload, OnlineReloadNoSave}
 import org.marvin.model.{EngineMetadata, MarvinEExecutorException}
@@ -27,6 +28,7 @@ import org.marvin.model.{EngineMetadata, MarvinEExecutorException}
 final case class Reload(protocol: String = "")
 final case class ReloadNoSave(protocol: String = "")
 final case class Reloaded(protocol: String)
+final case class FailedToReload(protocol: String = "")
 
 //states
 sealed trait State
@@ -42,11 +44,10 @@ final case class Model(protocol: String) extends Data
 class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) extends FSM[State, Data]{
   def this(metadata: EngineMetadata) = this(null, metadata)
 
-  var reloadStateTimeout: FiniteDuration = _
+  var reloadStateTimeout: FiniteDuration = metadata.reloadStateTimeout.getOrElse(180000) milliseconds
 
   override def preStart() {
     if (predictorActor == null) predictorActor = context.system.actorOf(Props(new OnlineAction("predictor", metadata)), name = "predictorActor")
-    reloadStateTimeout = metadata.reloadStateTimeout.getOrElse(180000) milliseconds
   }
 
   startWith(Unavailable, NoModel)
@@ -71,6 +72,10 @@ class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) exten
   when(Reloading, stateTimeout = reloadStateTimeout) {
     case Event(Reloaded(protocol), _) => {
       goto(Ready) using Model(protocol)
+    }
+    case Event(FailedToReload(protocol), _) => {
+      log.error(s"Failed to reload with protocol {$protocol}")
+      goto(Unavailable)
     }
     case Event(StateTimeout, _) => {
       log.warning("Reloading state timed out.")

@@ -22,7 +22,7 @@ import akka.pattern.pipe
 import io.grpc.ManagedChannelBuilder
 import org.marvin.model.EngineActionMetadata
 import org.marvin.executor.proxies.EngineProxy.{ExecuteOnline, HealthCheck, Reload}
-import org.marvin.executor.statemachine.Reloaded
+import org.marvin.executor.statemachine.{FailedToReload, Reloaded}
 
 class OnlineActionProxy(metadata: EngineActionMetadata) extends EngineProxy (metadata)  {
   var engineAsyncClient:OnlineActionHandlerStub = _
@@ -51,9 +51,13 @@ class OnlineActionProxy(metadata: EngineActionMetadata) extends EngineProxy (met
 
     case Reload(protocol) =>
       log.info(s"Start the reload remote procedure to ${metadata.name}. Protocol [$protocol]")
-      val message = engineClient.RemoteReload(ReloadRequest(artifacts=artifacts, protocol=protocol)).message
-      log.info(s"Reload remote procedure to ${metadata.name} Done with [${message}]. Protocol [$protocol]")
-      sender ! Reloaded(protocol)
+      try{
+        val message = engineClient.RemoteReload(ReloadRequest(artifacts=artifacts, protocol=protocol)).message
+        log.info(s"Reload remote procedure to ${metadata.name} Done with [${message}]. Protocol [$protocol]")
+        sender ! Reloaded(protocol)
+      } catch {
+        case _ : Exception => sender ! FailedToReload(protocol)
+      }
 
     case _ =>
       log.warning(s"Not valid message !!")

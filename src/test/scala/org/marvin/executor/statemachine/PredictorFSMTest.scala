@@ -80,13 +80,13 @@ class PredictorFSMTest extends TestKit(
       fsm.stateData should be (Model("protocol123"))
     }
 
-    "receive failure and stay Reloading when Reloading" in {
+    "receive failure and go to Unavailable when Reloading" in {
       val probe = TestProbe()
       val fsm = TestFSMRef[State, Data, PredictorFSM](new PredictorFSM(probe.ref, MetadataMock.simpleMockedMetadata()))
       fsm.setState(Reloading)
       fsm ! OnlineExecute("test", "test")
       probe.expectNoMsg
-      fsm.stateName should be (Reloading)
+      fsm.stateName should be (Unavailable)
       val returnedMessage = expectMsgType[akka.actor.Status.Failure]
       returnedMessage.cause shouldBe a[MarvinEExecutorException]
     }
