@@ -22,6 +22,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, ImplicitSender, TestFSMRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
 import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload, OnlineReloadNoSave}
+import org.marvin.executor.proxies.Reloaded
 import org.marvin.model.MarvinEExecutorException
 import org.marvin.testutil.MetadataMock
 import org.scalatest.{Matchers, WordSpecLike}
@@ -50,12 +51,12 @@ class PredictorFSMTest extends TestKit(
       fsm.stateData should be (ToReload(testProtocol))
     }
 
-    "go to Reloading when Unavailable and receive ReloadNoSave" in {
+    "go to Reloading when Unavailable and receive Reload with no protocol" in {
       val probe = TestProbe()
       val fsm = TestFSMRef[State, Data, PredictorFSM](new PredictorFSM(probe.ref, MetadataMock.simpleMockedMetadata()))
 
-      val testProtocol = "protocol1234"
-      fsm ! ReloadNoSave(testProtocol)
+      val testProtocol = ""
+      fsm ! Reload(testProtocol)
       probe.expectMsg(OnlineReloadNoSave(testProtocol))
       fsm.stateName should be (Reloading)
       fsm.stateData should be (ToReload(testProtocol))
@@ -124,12 +125,12 @@ class PredictorFSMTest extends TestKit(
       fsm.stateData should be (ToReload(protocol))
     }
 
-    "go to Reloading when Ready and receive ReloadNoSave" in {
+    "go to Reloading when Ready and receive Reload with no protocol" in {
       val probe = TestProbe()
       val fsm = TestFSMRef[State, Data, PredictorFSM](new PredictorFSM(probe.ref, MetadataMock.simpleMockedMetadata()))
       fsm.setState(Ready)
-      val protocol = "protocol99"
-      fsm ! ReloadNoSave(protocol)
+      val protocol = null
+      fsm ! Reload(protocol)
       probe.expectMsg(OnlineReloadNoSave(protocol))
       fsm.stateName should be (Reloading)
       fsm.stateData should be (ToReload(protocol))

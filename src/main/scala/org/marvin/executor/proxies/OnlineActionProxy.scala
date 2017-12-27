@@ -22,7 +22,10 @@ import akka.pattern.pipe
 import io.grpc.ManagedChannelBuilder
 import org.marvin.model.EngineActionMetadata
 import org.marvin.executor.proxies.EngineProxy.{ExecuteOnline, HealthCheck, Reload}
-import org.marvin.executor.statemachine.{FailedToReload, Reloaded}
+
+//Reload messages
+final case class Reloaded(protocol: String)
+final case class FailedToReload(protocol: String = "")
 
 class OnlineActionProxy(metadata: EngineActionMetadata) extends EngineProxy (metadata)  {
   var engineAsyncClient:OnlineActionHandlerStub = _

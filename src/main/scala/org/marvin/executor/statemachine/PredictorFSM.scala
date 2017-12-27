@@ -16,19 +16,16 @@
  */
 package org.marvin.executor.statemachine
 
-import akka.actor.SupervisorStrategy.{Restart, Stop}
 import akka.actor.{ActorRef, FSM, OneForOneStrategy, Props, SupervisorStrategy}
 
 import scala.concurrent.duration._
 import org.marvin.executor.actions.OnlineAction
-import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload, OnlineReloadNoSave}
+import org.marvin.executor.actions.OnlineAction._
+import org.marvin.executor.proxies.{FailedToReload, Reloaded}
 import org.marvin.model.{EngineMetadata, MarvinEExecutorException}
 
 //receive events
 final case class Reload(protocol: String = "")
-final case class ReloadNoSave(protocol: String = "")
-final case class Reloaded(protocol: String)
-final case class FailedToReload(protocol: String = "")
 
 //states
 sealed trait State
@@ -53,13 +50,10 @@ class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) exten
   startWith(Unavailable, NoModel)
 
   when(Unavailable) {
-    case Event(ReloadNoSave(protocol), _) => {
-      predictorActor ! OnlineReloadNoSave(protocol = protocol)
-      goto(Reloading) using ToReload(protocol)
-    }
     case Event(Reload(protocol), _) => {
-      predictorActor ! OnlineReload(protocol = protocol)
-      goto(Reloading) using ToReload(protocol)
+      val reloadMessage = selectReloadMessage(protocol)
+      predictorActor ! reloadMessage
+      goto(Reloading) using ToReload(protocol)git
     }
     case Event(e, s) => {
       log.warning("Engine is unavailable, not possible to perform event {} in state {}/{}", e, stateName, s)
@@ -95,11 +89,8 @@ class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) exten
       stay
     }
     case Event(Reload(protocol), _) => {
-      predictorActor ! OnlineReload(protocol = protocol)
-      goto(Reloading) using ToReload(protocol)
-    }
-    case Event(ReloadNoSave(protocol), _) => {
-      predictorActor ! OnlineReloadNoSave(protocol = protocol)
+      val reloadMessage = selectReloadMessage(protocol)
+      predictorActor ! reloadMessage
       goto(Reloading) using ToReload(protocol)
     }
     case Event(OnlineHealthCheck, _) => {
@@ -122,5 +113,13 @@ class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) exten
   }
 
   initialize()
+
+  def selectReloadMessage(protocol: String): ReloadType = {
+    if(protocol != null && !protocol.isEmpty){
+      OnlineReload(protocol = protocol)
+    } else {
+      OnlineReloadNoSave(protocol = protocol)
+    }
+  }
 
 }

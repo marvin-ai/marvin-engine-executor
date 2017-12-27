@@ -35,8 +35,9 @@ import scala.util.{Failure, Success}
 
 object OnlineAction {
   case class OnlineExecute(message: String, params: String)
-  case class OnlineReload(protocol:String)
-  case class OnlineReloadNoSave(protocol: String)
+  trait ReloadType
+  case class OnlineReload(protocol:String) extends ReloadType
+  case class OnlineReloadNoSave(protocol: String) extends ReloadType
   case class OnlineHealthCheck()
 }
 
