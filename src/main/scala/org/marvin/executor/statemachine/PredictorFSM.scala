@@ -53,7 +53,7 @@ class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) exten
     case Event(Reload(protocol), _) => {
       val reloadMessage = selectReloadMessage(protocol)
       predictorActor ! reloadMessage
-      goto(Reloading) using ToReload(protocol)git
+      goto(Reloading) using ToReload(protocol)
     }
     case Event(e, s) => {
       log.warning("Engine is unavailable, not possible to perform event {} in state {}/{}", e, stateName, s)
