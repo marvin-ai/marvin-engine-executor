@@ -18,7 +18,7 @@ package org.marvin.executor.actions
 
 import akka.Done
 import akka.actor.SupervisorStrategy._
-import akka.actor.{Actor, ActorLogging, ActorRef, OneForOneStrategy, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, OneForOneStrategy, Props, Status}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import io.grpc.StatusRuntimeException
@@ -61,7 +61,7 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
     OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = metadata.onlineActionTimeout milliseconds) {
       case _: StatusRuntimeException => Restart
       case _: Exception => Escalate
-    }
+  }
 
   override def receive  = {
     case OnlineExecute(message, params) =>
@@ -85,14 +85,13 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
         futures += (artifactSaver ? SaveToLocal(artifactName, splitedProtocols(artifactName)))
       }
 
+      val origSender = sender()
       Future.sequence(futures).onComplete {
-        case Success(response) =>
-          log.info(s"Reload to $actionName completed [$response] ! Protocol: [$protocol]")
-
-          onlineActionProxy forward Reload(protocol)
-
-        case Failure(failure) =>
-          failure.printStackTrace()
+        case Success(_) => onlineActionProxy.ask(Reload(protocol)) pipeTo origSender
+        case Failure(e) => {
+          log.error(s"Failure to reload artifacts using protocol $protocol.")
+          origSender ! Status.Failure(e)
+        }
       }
 
     case OnlineReloadNoSave(protocol) =>
