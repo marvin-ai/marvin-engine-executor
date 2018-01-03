@@ -37,7 +37,7 @@ object OnlineAction {
   case class OnlineExecute(message: String, params: String)
   trait ReloadType
   case class OnlineReload(protocol:String) extends ReloadType
-  case class OnlineReloadNoSave(protocol: String) extends ReloadType
+  case class OnlineReloadNoSave() extends ReloadType
   case class OnlineHealthCheck()
 }
 
@@ -87,12 +87,12 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
         }
       }
 
-    case OnlineReloadNoSave(protocol) =>
+    case OnlineReloadNoSave() =>
       implicit val futureTimeout = Timeout(metadata.reloadTimeout milliseconds)
 
-      log.info(s"Starting to process reload [no save] to $actionName. Protocol: [$protocol].")
+      log.info(s"Starting to process reload [no save] to $actionName.")
 
-      onlineActionProxy forward Reload(protocol)
+      onlineActionProxy forward Reload()
 
     case OnlineHealthCheck =>
       implicit val futureTimeout = Timeout(metadata.healthCheckTimeout milliseconds)

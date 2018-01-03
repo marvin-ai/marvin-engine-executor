@@ -55,11 +55,10 @@ class PredictorFSMTest extends TestKit(
       val probe = TestProbe()
       val fsm = TestFSMRef[State, Data, PredictorFSM](new PredictorFSM(probe.ref, MetadataMock.simpleMockedMetadata()))
 
-      val testProtocol = ""
-      fsm ! Reload(testProtocol)
-      probe.expectMsg(OnlineReloadNoSave(testProtocol))
+      fsm ! Reload()
+      probe.expectMsg(OnlineReloadNoSave())
       fsm.stateName should be (Reloading)
-      fsm.stateData should be (ToReload(testProtocol))
+      fsm.stateData should be (ToReload(""))
     }
 
     "stay unavailable and send a failure when unavailable and receive unknown message" in {
@@ -131,9 +130,9 @@ class PredictorFSMTest extends TestKit(
       fsm.setState(Ready)
       val protocol = null
       fsm ! Reload(protocol)
-      probe.expectMsg(OnlineReloadNoSave(protocol))
+      probe.expectMsg(OnlineReloadNoSave())
       fsm.stateName should be (Reloading)
-      fsm.stateData should be (ToReload(protocol))
+      fsm.stateData should be (ToReload(null))
     }
 
     "stay in the same state and log a warning when unknown event is sent" in {

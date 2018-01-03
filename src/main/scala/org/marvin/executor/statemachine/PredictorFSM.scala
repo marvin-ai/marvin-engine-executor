@@ -118,7 +118,7 @@ class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) exten
     if(protocol != null && !protocol.isEmpty){
       OnlineReload(protocol = protocol)
     } else {
-      OnlineReloadNoSave(protocol = protocol)
+      OnlineReloadNoSave()
     }
   }
 
