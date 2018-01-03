@@ -72,7 +72,7 @@ object JsonUtil extends Logging {
     val processingReport = validator.validate(schema, jsonToValidate)
     if (!processingReport.isSuccess) {
       processingReport.forEach {
-        message: ProcessingMessage => println(message.asJson())
+        message: ProcessingMessage => info(message.asJson())
       }
       throw new ProcessingException
     }
