@@ -21,7 +21,7 @@ import actions.OnlineActionResponse
 import akka.actor.ActorSystem
 import akka.testkit.{EventFilter, ImplicitSender, TestFSMRef, TestKit, TestProbe}
 import com.typesafe.config.ConfigFactory
-import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload, OnlineReloadNoSave}
+import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload}
 import org.marvin.executor.proxies.Reloaded
 import org.marvin.model.MarvinEExecutorException
 import org.marvin.testutil.MetadataMock
@@ -56,7 +56,7 @@ class PredictorFSMTest extends TestKit(
       val fsm = TestFSMRef[State, Data, PredictorFSM](new PredictorFSM(probe.ref, MetadataMock.simpleMockedMetadata()))
 
       fsm ! Reload()
-      probe.expectMsg(OnlineReloadNoSave())
+      probe.expectMsg(OnlineReload(""))
       fsm.stateName should be (Reloading)
       fsm.stateData should be (ToReload(""))
     }
@@ -130,7 +130,7 @@ class PredictorFSMTest extends TestKit(
       fsm.setState(Ready)
       val protocol = null
       fsm ! Reload(protocol)
-      probe.expectMsg(OnlineReloadNoSave())
+      probe.expectMsg(OnlineReload(null))
       fsm.stateName should be (Reloading)
       fsm.stateData should be (ToReload(null))
     }

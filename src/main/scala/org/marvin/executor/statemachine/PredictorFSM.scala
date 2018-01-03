@@ -51,8 +51,7 @@ class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) exten
 
   when(Unavailable) {
     case Event(Reload(protocol), _) => {
-      val reloadMessage = selectReloadMessage(protocol)
-      predictorActor ! reloadMessage
+      predictorActor ! OnlineReload(protocol = protocol)
       goto(Reloading) using ToReload(protocol)
     }
     case Event(e, s) => {
@@ -89,8 +88,7 @@ class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) exten
       stay
     }
     case Event(Reload(protocol), _) => {
-      val reloadMessage = selectReloadMessage(protocol)
-      predictorActor ! reloadMessage
+      predictorActor ! OnlineReload(protocol = protocol)
       goto(Reloading) using ToReload(protocol)
     }
     case Event(OnlineHealthCheck, _) => {
@@ -113,13 +111,5 @@ class PredictorFSM(var predictorActor: ActorRef, metadata: EngineMetadata) exten
   }
 
   initialize()
-
-  def selectReloadMessage(protocol: String): ReloadType = {
-    if(protocol != null && !protocol.isEmpty){
-      OnlineReload(protocol = protocol)
-    } else {
-      OnlineReloadNoSave()
-    }
-  }
 
 }
