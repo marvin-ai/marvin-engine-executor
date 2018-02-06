@@ -47,7 +47,7 @@ class PipelineAction(metadata: EngineMetadata) extends Actor with ActorLogging{
 
   override def receive  = {
     case PipelineExecute(protocol, params) =>
-      implicit val futureTimeout = Timeout(200 seconds)
+      implicit val futureTimeout = Timeout(metadata.pipelineTimeout seconds)
 
       log.info(s"Starting to process pipeline process with. Protocol: [$protocol] and Params: [$params].")
 

@@ -78,6 +78,7 @@ class ProtocolUtilTest extends WordSpec with Matchers {
           engineType = "python",
           hdfsHost = "",
           healthCheckTimeout = 100,
+          pipelineTimeout = 50,
           onlineActionTimeout = 100,
           pipelineActions = List("acquisitor", "tpreparator"),
           reloadStateTimeout = Some(500),
