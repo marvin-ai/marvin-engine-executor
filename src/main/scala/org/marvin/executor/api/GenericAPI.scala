@@ -75,7 +75,7 @@ class GenericAPI(system: ActorSystem,
   val healthCheckTimeout = Timeout(metadata.healthCheckTimeout millisecond)
   val batchActionTimeout = Timeout(metadata.batchActionTimeout millisecond)
   val reloadTimeout = Timeout(metadata.reloadTimeout millisecond)
-  val pipelineTimeout = Timeout((metadata.reloadTimeout + metadata.batchActionTimeout) * metadata.pipelineActions.length * 1.20 milliseconds)
+  val pipelineTimeout = metadata.pipelineTimeout
 
   val log: LoggingAdapter = Logging.getLogger(system, this)
 
