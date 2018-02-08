@@ -16,9 +16,7 @@
  */
 package org.marvin.model
 
-import akka.util.Timeout
 import scala.collection.mutable.Map
-import scala.concurrent.duration._
 
 case class EngineMetadata(name:String,
                           version:String,
@@ -28,18 +26,18 @@ case class EngineMetadata(name:String,
                           artifactManagerType:String,
                           s3BucketName:String,
                           pipelineActions: List[String],
-                          onlineActionTimeout:Int,
-                          healthCheckTimeout:Int,
-                          reloadTimeout:Int,
-                          reloadStateTimeout: Option[Int],
-                          batchActionTimeout:Int,
+                          onlineActionTimeout:Double,
+                          healthCheckTimeout:Double,
+                          reloadTimeout:Double,
+                          reloadStateTimeout: Option[Double],
+                          batchActionTimeout:Double,
                           hdfsHost:String){
   
   override def toString: String = name
 
   val artifactsLocalPath: String = sys.env.getOrElse("MARVIN_DATA_PATH", "/tmp").mkString.concat( "/.artifacts")
 
-  val pipelineTimeout: Timeout = Timeout((reloadTimeout + batchActionTimeout) * pipelineActions.length * 1.20 milliseconds)
+  val pipelineTimeout: Double = (reloadTimeout + batchActionTimeout) * pipelineActions.length * 1.20
 
   val actionsMap: Map[String, EngineActionMetadata] = {
     val map = Map[String, EngineActionMetadata]()
