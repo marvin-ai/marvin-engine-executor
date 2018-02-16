@@ -14,6 +14,8 @@
 
 .PHONY: help package test clean
 
+SBT_VERSION?=0.13.9
+
 help:
 	@echo "    package"
 	@echo "        Builds a uber-jar with all engine-executor code and it's dependencies."
@@ -30,3 +32,10 @@ test:
 
 clean:
 		sbt/sbt clean
+
+sonatype-publish:
+    sbt/sbt publishSigned
+
+sonatype-createfile:
+  	echo "credentials += Credentials(\"Sonatype Nexus Repository Manager\",\"oss.sonatype.org\",\"(Sonatype user name)\",\"(Sonatype password)\")" >> $HOME/.sbt/$(SBT_VERSION)/sonatype.sbt
+
