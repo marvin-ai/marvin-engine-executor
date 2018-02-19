@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: help package test clean
+.PHONY: help package test clean sonatype-publish sonatype-createfile
 
 SBT_VERSION?=0.13.9
 
@@ -23,19 +23,24 @@ help:
 	@echo "        Run all marvin engine-executor unit tests."
 	@echo "    clean"
 	@echo "        Clean the build artifacts."
+	@echo "    sonatype-publish"
+	@echo "        Publish package to maven central repository."
+	@echo "    sonatype-createfile"
+	@echo "        Create a new sonatype.sbt file to register repository and credentials."
 
 package:
-		sbt/sbt assembly
+	sbt/sbt assembly
 
 test:
-		sbt/sbt coverage test coverageReport
+	sbt/sbt coverage test coverageReport
 
 clean:
-		sbt/sbt clean
+	sbt/sbt clean
 
 sonatype-publish:
-    sbt/sbt publishSigned
+	sbt/sbt publishSigned
 
 sonatype-createfile:
-  	echo "credentials += Credentials(\"Sonatype Nexus Repository Manager\",\"oss.sonatype.org\",\"(Sonatype user name)\",\"(Sonatype password)\")" >> $HOME/.sbt/$(SBT_VERSION)/sonatype.sbt
+	mkdir -p $(HOME)/.sbt/$(SBT_VERSION)
+	echo "credentials += Credentials(\"Sonatype Nexus Repository Manager\",\"oss.sonatype.org\",\"(Sonatype user name)\",\"(Sonatype password)\")" >> $(HOME)/.sbt/$(SBT_VERSION)/sonatype.sbt
 
