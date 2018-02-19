@@ -29,16 +29,16 @@ help:
 	@echo "        Create a new sonatype.sbt file to register repository and credentials."
 
 package:
-	sbt/sbt assembly
+	sbt assembly
 
 test:
-	sbt/sbt coverage test coverageReport
+	sbt coverage test coverageReport
 
 clean:
-	sbt/sbt clean
+	sbt clean
 
 sonatype-publish:
-	sbt/sbt publishSigned
+	sbt publishSigned
 
 sonatype-createfile:
 	mkdir -p $(HOME)/.sbt/$(SBT_VERSION)
