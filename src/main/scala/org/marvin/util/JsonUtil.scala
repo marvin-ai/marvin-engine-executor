@@ -16,6 +16,8 @@
  */
 package org.marvin.util
 
+import java.io.{InputStream, InputStreamReader, Reader}
+
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import grizzled.slf4j.Logging
@@ -50,19 +52,31 @@ object JsonUtil extends Logging {
     jacksonMapper.readValue[T](jsonString, classTag[T].runtimeClass.asInstanceOf[Class[T]])
   }
 
-  def validateJson[T: ClassTag](jsonString: String) = {
+  def validateJson[T: ClassTag](jsonString: String): Unit = {
     val className = classTag[T].runtimeClass.getSimpleName
     val schemaName = "/" + className.toString + "Schema.json"
-    val jsonToValidate: JSONObject = new JSONObject(jsonString)
-
-    var jsonSchema: JSONObject = new JSONObject()
 
     try{
-      jsonSchema = new JSONObject(new JSONTokener(getClass.getResourceAsStream(schemaName)))
+      val schemaInputStream = getClass.getResourceAsStream(schemaName)
+
+      validateJson(jsonString, new InputStreamReader(schemaInputStream))
     } catch {
       case e: NullPointerException => info(s"File ${schemaName} not found, check your schema file")
         throw e
     }
+  }
+
+  /**
+    * Validates a json against a schema file (Draft-4) informed.
+    * @param jsonString - The json string to be validated.
+    * @param schemaInputReader - The input stream to the schema file.
+    */
+  def validateJson(jsonString: String, schemaInputReader: Reader): Unit = {
+    val jsonToValidate: JSONObject = new JSONObject(jsonString)
+
+    var jsonSchema: JSONObject = new JSONObject()
+
+    jsonSchema = new JSONObject(new JSONTokener(schemaInputReader))
 
     val schema = SchemaLoader.load(jsonSchema)
 

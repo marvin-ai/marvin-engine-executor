@@ -16,7 +16,8 @@
  */
 package org.marvin.executor.api
 
-import java.io.FileNotFoundException
+import java.io._
+import java.nio.file.{Files, Paths}
 import java.util.concurrent.Executors
 
 import actions.HealthCheckResponse.Status
@@ -37,18 +38,38 @@ import scala.io.Source
 import scala.concurrent.duration._
 import org.marvin.executor.api.exception.EngineExceptionAndRejectionHandler._
 import spray.json.DefaultJsonProtocol._
+import spray.json._
 import org.marvin.executor.api.model.HealthStatus
 import org.marvin.model.{EngineMetadata, MarvinEExecutorException}
 import org.marvin.executor.actions.BatchAction.{BatchExecute, BatchHealthCheck, BatchReload}
 import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck}
 import org.marvin.executor.actions.PipelineAction.PipelineExecute
+import org.marvin.executor.api.exception.ErrorResponse
 import org.marvin.executor.statemachine.{PredictorFSM, Reload, ReloadNoSave}
 
+import collection.JavaConverters._
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 case class HttpEngineResponse(result: String)
-case class HttpEngineRequest(params: Option[String] = Option.empty, message: Option[String] = Option.empty)
+case class HttpEngineRequest(params: Option[String] = Option.empty, message: Option[JsValue] = Option.empty) {
+  if (GenericHttpAPI.predictorSchemaFileIS != null && !message.isEmpty) {
+    try{
+      GenericHttpAPI.predictorSchemaFileIS.getChannel.position(0)
+      JsonUtil.validateJson(message.get.prettyPrint, new BufferedReader(new InputStreamReader(GenericHttpAPI.predictorSchemaFileIS)))
+    } catch{
+      case e: ValidationException => {
+        val messages = e.getAllMessages().asScala.mkString(", ")
+        val error = ErrorResponse(messages)
+        throw new IllegalArgumentException(errorFormatter.write(error).toString())
+      }
+      case t: Throwable => {
+        logger.error(t)
+        throw t
+      }
+    }
+  }
+}
 
 class GenericHttpAPIImpl() extends GenericHttpAPI
 
@@ -76,6 +97,11 @@ object GenericHttpAPI extends HttpMarvinApp {
   var reloadTimeout:Timeout = _
   var pipelineTimeout:Timeout = _
 
+  var engineMetadataFileName: String = "engine.metadata"
+  var engineParamsFileName: String = "engine.params"
+
+  var predictorSchemaFileIS: FileInputStream = _
+
   implicit val httpEngineResponseFormat = jsonFormat1(HttpEngineResponse)
   implicit val httpEngineRequestFormat = jsonFormat2(HttpEngineRequest)
   implicit val healthStatusFormat = jsonFormat2(HealthStatus)
@@ -87,7 +113,7 @@ object GenericHttpAPI extends HttpMarvinApp {
           path("predictor") {
             entity(as[HttpEngineRequest]) { request =>
               require(!request.message.isEmpty, "The request payload must contain the attribute 'message'.")
-              val response_message = api.onlineExecute("predictor", request.params.getOrElse(defaultParams), request.message.get)
+              val response_message = api.onlineExecute("predictor", request.params.getOrElse(defaultParams), request.message.get.prettyPrint)
               onComplete(api.toHttpEngineResponseFuture(response_message)){ response =>
                 response match{
                   case Success(httpEngineResponse) => complete(httpEngineResponse)
@@ -217,11 +243,10 @@ object GenericHttpAPI extends HttpMarvinApp {
   }
 
   def main(args: Array[String]): Unit = {
-    val engineFilePath = s"${ConfigurationContext.getStringConfigOrDefault("engineHome", ".")}/engine.metadata"
-    val paramsFilePath = s"${ConfigurationContext.getStringConfigOrDefault("engineHome", ".")}/engine.params"
+    val engineHome = ConfigurationContext.getStringConfigOrDefault("engineHome", ".")
 
     val modelProtocolToLoad = ConfigurationContext.getStringConfigOrDefault("modelProtocol", "")
-    GenericHttpAPI.system = api.setupSystem(engineFilePath, paramsFilePath, modelProtocolToLoad)
+    GenericHttpAPI.system = api.setupSystem(engineHome, modelProtocolToLoad)
     val ipAddress = ConfigurationContext.getStringConfigOrDefault("ipAddress", "localhost")
     val port = ConfigurationContext.getIntConfigOrDefault("port", 8000)
 
@@ -230,11 +255,13 @@ object GenericHttpAPI extends HttpMarvinApp {
 }
 
 trait GenericHttpAPI {
-  protected def setupSystem(engineFilePath:String, paramsFilePath:String, modelProtocol:String): ActorSystem = {
+  protected def setupSystem(engineHome: String, modelProtocol:String): ActorSystem = {
+    val engineFilePath = s"${engineHome}/${GenericHttpAPI.engineMetadataFileName}"
     val metadata = readJsonIfFileExists[EngineMetadata](engineFilePath, true)
     val system = ActorSystem(s"MarvinExecutorSystem")
 
     GenericHttpAPI.metadata = metadata
+    val paramsFilePath = s"${engineHome}/${GenericHttpAPI.engineParamsFileName}"
     GenericHttpAPI.defaultParams = JsonUtil.toJson(readJsonIfFileExists[Map[String, String]](paramsFilePath))
     GenericHttpAPI.log = Logging.getLogger(system, this)
 
@@ -252,6 +279,13 @@ trait GenericHttpAPI {
     GenericHttpAPI.evaluatorActor = system.actorOf(Props(new BatchAction("evaluator", metadata)), name = "evaluatorActor")
     GenericHttpAPI.pipelineActor = system.actorOf(Props(new PipelineAction(metadata)), name = "pipelineActor")
     GenericHttpAPI.predictorFSM = system.actorOf(Props(new PredictorFSM(metadata)), name = "predictorFSM")
+
+    val messageSchemaFile = s"$engineHome/MessageSchema.json"
+    try{
+      GenericHttpAPI.predictorSchemaFileIS = new FileInputStream(messageSchemaFile)
+    } catch{
+      case e: FileNotFoundException => logger.info(s"Will not validate predictor input messages against schema. Schema file [$messageSchemaFile] not found.")
+    }
 
     if(!metadata.actionsMap.get("predictor").isEmpty){
       modelProtocol match {
