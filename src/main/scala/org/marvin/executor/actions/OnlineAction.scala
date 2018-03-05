@@ -17,15 +17,17 @@
 package org.marvin.executor.actions
 
 import akka.Done
-import akka.actor.{Actor, ActorLogging, ActorRef, Props, Status}
+import akka.actor.SupervisorStrategy._
+import akka.actor.{Actor, ActorLogging, ActorRef, OneForOneStrategy, Props, Status}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
-import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload, OnlineReloadNoSave}
-import org.marvin.manager.ArtifactSaver
-import org.marvin.model.{EngineActionMetadata, EngineMetadata}
-import org.marvin.manager.ArtifactSaver.SaveToLocal
+import io.grpc.StatusRuntimeException
+import org.marvin.artifact.manager.ArtifactSaver
+import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload}
 import org.marvin.executor.proxies.EngineProxy.{ExecuteOnline, HealthCheck, Reload}
 import org.marvin.executor.proxies.OnlineActionProxy
+import org.marvin.artifact.manager.ArtifactSaver.SaveToLocal
+import org.marvin.model.{EngineActionMetadata, EngineMetadata}
 import org.marvin.util.ProtocolUtil
 
 import scala.collection.mutable.ListBuffer
@@ -36,7 +38,6 @@ import scala.util.{Failure, Success}
 object OnlineAction {
   case class OnlineExecute(message: String, params: String)
   case class OnlineReload(protocol:String)
-  case class OnlineReloadNoSave(protocol: String)
   case class OnlineHealthCheck()
 }
 
@@ -46,13 +47,18 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
   var engineActionMetadata: EngineActionMetadata = _
   var artifactsToLoad: String = _
   implicit val ec = context.dispatcher
-  var protocolUtil = new ProtocolUtil()
 
   override def preStart() = {
     engineActionMetadata = metadata.actionsMap(actionName)
     artifactsToLoad = engineActionMetadata.artifactsToLoad.mkString(",")
     onlineActionProxy = context.actorOf(Props(new OnlineActionProxy(engineActionMetadata)), name = "onlineActionProxy")
     artifactSaver = context.actorOf(ArtifactSaver.build(metadata), name = "artifactSaver")
+  }
+
+  override val supervisorStrategy =
+    OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = metadata.onlineActionTimeout milliseconds) {
+      case _: StatusRuntimeException => Restart
+      case _: Exception => Escalate
   }
 
   override def receive  = {
@@ -70,28 +76,26 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
 
       log.info(s"Starting to process reload to $actionName. Protocol: [$protocol].")
 
-      val splitedProtocols = protocolUtil.splitProtocol(protocol, metadata)
+      if(protocol == null || protocol.isEmpty){
+        onlineActionProxy forward Reload()
 
-      val futures:ListBuffer[Future[Any]] = ListBuffer[Future[Any]]()
-      for(artifactName <- engineActionMetadata.artifactsToLoad) {
-        futures += (artifactSaver ? SaveToLocal(artifactName, splitedProtocols(artifactName)))
-      }
+      }else{
+        val splitedProtocols = ProtocolUtil.splitProtocol(protocol, metadata)
 
-      val origSender = sender()
-      Future.sequence(futures).onComplete{
-        case Success(_) => onlineActionProxy.ask(Reload(protocol)) pipeTo origSender
-        case Failure(e) => {
-          log.error(s"Failure to reload artifacts using protocol $protocol.")
-          origSender ! Status.Failure(e)
+        val futures:ListBuffer[Future[Any]] = ListBuffer[Future[Any]]()
+        for(artifactName <- engineActionMetadata.artifactsToLoad) {
+          futures += (artifactSaver ? SaveToLocal(artifactName, splitedProtocols(artifactName)))
+        }
+
+        val origSender = sender()
+        Future.sequence(futures).onComplete{
+          case Success(_) => onlineActionProxy.ask(Reload(protocol)) pipeTo origSender
+          case Failure(e) => {
+            log.error(s"Failure to reload artifacts using protocol $protocol.")
+            origSender ! Status.Failure(e)
+          }
         }
       }
-
-    case OnlineReloadNoSave(protocol) =>
-      implicit val futureTimeout = Timeout(metadata.reloadTimeout milliseconds)
-
-      log.info(s"Starting to process reload [no save] to $actionName. Protocol: [$protocol].")
-
-      onlineActionProxy forward Reload(protocol)
 
     case OnlineHealthCheck =>
       implicit val futureTimeout = Timeout(metadata.healthCheckTimeout milliseconds)

@@ -16,16 +16,16 @@
  */
 package org.marvin.util
 
-import java.io.{InputStream, InputStreamReader, Reader}
-
-import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
+import com.fasterxml.jackson.databind.{DeserializationFeature, JsonNode, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.github.fge.jsonschema.core.exceptions.ProcessingException
+import com.github.fge.jsonschema.core.report.ProcessingMessage
+import com.github.fge.jsonschema.main.JsonSchemaFactory
 import grizzled.slf4j.Logging
-import org.everit.json.schema.ValidationException
-import org.everit.json.schema.loader.SchemaLoader
-import org.json.{JSONObject, JSONTokener}
+import org.json4s.jackson.JsonMethods.{asJsonNode, parse}
 import spray.json._
 
+import scala.io.Source
 import scala.reflect.{ClassTag, _}
 
 object JsonUtil extends Logging {
@@ -54,12 +54,13 @@ object JsonUtil extends Logging {
 
   def validateJson[T: ClassTag](jsonString: String): Unit = {
     val className = classTag[T].runtimeClass.getSimpleName
-    val schemaName = "/" + className.toString + "Schema.json"
+    val schemaName = className.toString + "Schema.json"
+
+    var jsonSchema: String = null
 
     try{
-      val schemaInputStream = getClass.getResourceAsStream(schemaName)
-
-      validateJson(jsonString, new InputStreamReader(schemaInputStream))
+      jsonSchema = Source.fromResource(schemaName).mkString
+      validateJson(jsonString, jsonSchema)
     } catch {
       case e: NullPointerException => info(s"File ${schemaName} not found, check your schema file")
         throw e
@@ -69,23 +70,24 @@ object JsonUtil extends Logging {
   /**
     * Validates a json against a schema file (Draft-4) informed.
     * @param jsonString - The json string to be validated.
-    * @param schemaInputReader - The input stream to the schema file.
+    * @param jsonSchema - The content of the schema file as a string.
     */
-  def validateJson(jsonString: String, schemaInputReader: Reader): Unit = {
-    val jsonToValidate: JSONObject = new JSONObject(jsonString)
+  def validateJson(jsonString: String, jsonSchema: String): Unit = {
 
-    var jsonSchema: JSONObject = new JSONObject()
+    val schema: JsonNode = asJsonNode(parse(jsonSchema))
+    val jsonToValidate: JsonNode = asJsonNode(parse(jsonString))
+    val validator = JsonSchemaFactory.byDefault().getValidator
 
-    jsonSchema = new JSONObject(new JSONTokener(schemaInputReader))
-
-    val schema = SchemaLoader.load(jsonSchema)
-
-    try {
-      schema.validate(jsonToValidate)
-    } catch {
-      case e: ValidationException =>
-        e.getCausingExceptions.forEach(e => e.printStackTrace)
-        throw e
+    val processingReport = validator.validate(schema, jsonToValidate)
+    if (!processingReport.isSuccess) {
+      val sb = new StringBuilder()
+      processingReport.forEach {
+        message: ProcessingMessage => {
+          warn(message.asJson())
+          sb.append(message.getMessage)
+        }
+      }
+      throw new ProcessingException(sb.toString)
     }
   }
 
