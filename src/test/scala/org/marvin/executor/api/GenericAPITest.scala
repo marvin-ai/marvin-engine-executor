@@ -16,13 +16,11 @@
  */
 package org.marvin.executor.api
 
-import java.io.FileInputStream
-
 import actions.HealthCheckResponse.Status
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode, StatusCodes}
-import akka.http.scaladsl.server.{Route, ValidationRejection}
+import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.testkit.TestProbe
 import org.marvin.exception.MarvinEExecutorException
@@ -34,6 +32,7 @@ import org.marvin.fixtures.MetadataMock
 import org.marvin.model.EngineMetadata
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Inside, Matchers, WordSpec}
+import spray.json.{JsValue, _}
 
 import scala.io.Source
 
@@ -45,15 +44,15 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null, null)
 
     "interpret the input message and respond with media type json" in {
 
-      val message = "{\n  \"msg\": \"testQuery\"\n}"
-      val params = "testParams"
+      val message = "{\"msg\":\"testQuery\"}"
+      val params = "{\"p1\":\"testParams\"}"
       val response = "fooReply"
 
-      val result = Post("/predictor", HttpEntity(`application/json`, s"""{"params":"$params","message":$message}""")) ~> api.routes ~> runRoute
+      val result = Post("/predictor", HttpEntity(`application/json`, s"""{"params":$params,"message":$message}""")) ~> api.routes ~> runRoute
 
       val expectedMessage = OnlineExecute(message, params)
       actor.expectMsg(expectedMessage)
@@ -75,9 +74,8 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
 
     "use default params when no params is informed" in {
 
-      val message = "{\n  \"msg\": \"testQuery\"\n}"
-      val response = "noParams"
-
+      val message = "{\"msg\":\"testQuery\"}"
+      val response = "check"
       val result = Post("/predictor", HttpEntity(`application/json`, s"""{"message":$message}""")) ~> api.routes ~> runRoute
 
       val expectedMessage = OnlineExecute(message, defaultParams)
@@ -92,7 +90,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
 
     "fail fast when the timeout is reached" in {
 
-      val message = "{\n  \"msg\": \"testQuery\"\n}"
+      val message = "{\"msg\":\"testQuery\"}"
 
       val metadata = EngineMetadata(
         name = "test",
@@ -111,7 +109,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
         version = "1"
       )
 
-      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null)
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null, null)
 
       val result = Post("/predictor", HttpEntity(`application/json`, s"""{"message":$message}""")) ~> api.routes ~> runRoute
 
@@ -126,30 +124,64 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     }
 
     "validate the input message when there is a schema file in the root folder" in{
-      val messageSchemaFile = getClass.getResource("/MessageSchema.json").getPath
-      GenericAPI.predictorSchemaFile = Source.fromFile(messageSchemaFile).mkString
+      val metadata = EngineMetadata(
+        name = "test",
+        actions = null,
+        artifactsRemotePath = "",
+        artifactManagerType = "",
+        s3BucketName = "",
+        batchActionTimeout = 50,
+        engineType = "",
+        hdfsHost = "",
+        healthCheckTimeout = 50,
+        onlineActionTimeout = 3000,
+        pipelineActions = List(),
+        reloadStateTimeout = Some(250),
+        reloadTimeout = 50,
+        version = "1"
+      )
 
-      val message = "{\n  \"msg\": \"testQuery\"\n}"
+      val messageSchemaFile = getClass.getResource("/engine_home/predictor-message.schema").getPath
+      val schemas = Map[String, String]("predictor-message"-> Source.fromFile(messageSchemaFile).mkString)
+
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null, schemas)
+
+      val message = "{\n  \"msg\":\"testQuery\"\n}"
 
       val result = Post("/predictor", HttpEntity(`application/json`, s"""{"message":$message}""")) ~> api.routes ~> runRoute
 
       check {
-        val expectedErrorMessage = "{\"errorMessage\":\"fatal: object has missing required properties ([\\\"firstName\\\",\\\"lastName\\\"])\\n    level: \\\"fatal\\\"\\n\"}"
-        rejection.asInstanceOf[ValidationRejection].message shouldEqual expectedErrorMessage
-
-        val expectedException = new IllegalArgumentException(expectedErrorMessage)
-        rejection.asInstanceOf[ValidationRejection].cause.get.getClass shouldEqual new IllegalArgumentException().getClass
+        status shouldEqual StatusCodes.BadRequest
+        responseAs[String] shouldEqual "{\"errorMessage\":\"object has missing required properties ([\\\"firstName\\\",\\\"lastName\\\"])\"}"
       }(result)
-      GenericAPI.predictorSchemaFile = null
     }
 
     "validate the input message and accept when there is a schema file in the root folder" in {
-      val messageSchemaFile = getClass.getResource("/MessageSchema.json").getPath
-      GenericAPI.predictorSchemaFile = Source.fromFile(messageSchemaFile).mkString
+      val metadata = EngineMetadata(
+        name = "test",
+        actions = null,
+        artifactsRemotePath = "",
+        artifactManagerType = "",
+        s3BucketName = "",
+        batchActionTimeout = 50,
+        engineType = "",
+        hdfsHost = "",
+        healthCheckTimeout = 50,
+        onlineActionTimeout = 50,
+        pipelineActions = List(),
+        reloadStateTimeout = Some(250),
+        reloadTimeout = 50,
+        version = "1"
+      )
+
+      val messageSchemaFile = getClass.getResource("/engine_home/predictor-message.schema").getPath
+      val schemas = Map[String, String]("predictor-message"-> Source.fromFile(messageSchemaFile).mkString)
 
       val response = "responseText"
 
-      val message = "{\n  \"firstName\": \"testName\",\n  \"lastName\": \"testLastName\"\n}"
+      val message = "{\"firstName\":\"testName\",\"lastName\":\"testLastName\"}"
+
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null, schemas)
 
       val result = Post("/predictor", HttpEntity(`application/json`, s"""{"message":$message}""")) ~> api.routes ~> runRoute
 
@@ -160,16 +192,34 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
         responseAs[String] shouldEqual "{\"result\":\"responseText\"}"
         status shouldEqual StatusCodes.OK
       }(result)
-      GenericAPI.predictorSchemaFile = null
     }
 
     "validate several predictions and accept when there is a schema file in the root folder" in {
-      val messageSchemaFile = getClass.getResource("/MessageSchema.json").getPath
-      GenericAPI.predictorSchemaFile = Source.fromFile(messageSchemaFile).mkString
+      val metadata = EngineMetadata(
+        name = "test",
+        actions = null,
+        artifactsRemotePath = "",
+        artifactManagerType = "",
+        s3BucketName = "",
+        batchActionTimeout = 50,
+        engineType = "",
+        hdfsHost = "",
+        healthCheckTimeout = 50,
+        onlineActionTimeout = 50,
+        pipelineActions = List(),
+        reloadStateTimeout = Some(250),
+        reloadTimeout = 50,
+        version = "1"
+      )
+
+      val messageSchemaFile = getClass.getResource("/engine_home/predictor-message.schema").getPath
+      val schemas = Map[String, String]("predictor-message"-> Source.fromFile(messageSchemaFile).mkString)
 
       val response = "ok"
 
-      val message = "{\n  \"firstName\": \"testName\",\n  \"lastName\": \"testLastName\"\n}"
+      val message = "{\"firstName\":\"testName\",\"lastName\":\"testLastName\"}"
+
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null, schemas)
 
       for (i <- 0 to 2) {
         println(s"Testing post $i.")
@@ -182,7 +232,6 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
           responseAs[String] shouldEqual "{\"result\":\"ok\"}"
           status shouldEqual StatusCodes.OK
         }(result)
-        GenericAPI.predictorSchemaFile = null
       }
     }
   }
@@ -192,14 +241,14 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null, null)
 
     "interpret the input message and respond with media type json" in {
-      val message = "{\n  \"msg\": \"testQuery\"\n}"
-      val params = "testParams"
+      val message = "{\"msg\":\"testQuery\"}"
+      val params = "{\"p1\":\"testParams\"}"
       val response = "fooReply"
 
-      val result = Post("/feedback", HttpEntity(`application/json`, s"""{"params":"$params","message":$message}""")) ~> api.routes ~> runRoute
+      val result = Post("/feedback", HttpEntity(`application/json`, s"""{"params":$params,"message":$message}""")) ~> api.routes ~> runRoute
 
       val expectedMessage = OnlineExecute(message, params)
       actor.expectMsg(expectedMessage)
@@ -221,7 +270,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
 
     "use default params when no params is informed" in {
 
-      val message = "{\n  \"msg\": \"testQuery\"\n}"
+      val message = "{\"msg\":\"testQuery\"}"
       val response = "noParams"
 
       val result = Post("/feedback", HttpEntity(`application/json`, s"""{"message":$message}""")) ~> api.routes ~> runRoute
@@ -238,7 +287,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
 
     "fail fast when the timeout is reached" in {
 
-      val message = "{\n  \"msg\": \"testQuery\"\n}"
+      val message = "{\"msg\":\"testQuery\"}"
 
       val metadata = EngineMetadata(
         name = "test",
@@ -257,7 +306,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
         version = "1"
       )
 
-      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null)
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null, null)
 
       val result = Post("/feedback", HttpEntity(`application/json`, s"""{"message":$message}""")) ~> api.routes ~> runRoute
 
@@ -279,15 +328,15 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val defaultParams = ""
     val protocol = "acquisitor_mockedProtocol"
 
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("acquisitor" -> actor.ref), null){
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("acquisitor" -> actor.ref), null, null){
       override def generateProtocol(actionName: String):String = protocol
     }
 
     "interpret params and call BatchActor" in {
 
-      val params = "testParams"
+      val params = "{\"p1\":\"testParams\"}"
 
-      val result = Post("/acquisitor", HttpEntity(`application/json`, s"""{"params": "$params"}""")) ~> api.routes ~> runRoute
+      val result = Post("/acquisitor", HttpEntity(`application/json`, s"""{"params":$params}""")) ~> api.routes ~> runRoute
 
       val expectedMessage = BatchExecute(protocol, params)
       actor.expectMsg(expectedMessage)
@@ -319,15 +368,15 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val defaultParams = ""
     val protocol = "tpreparator_mockedProtocol"
 
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null){
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null, null){
       override def generateProtocol(actionName: String):String = protocol
     }
 
     "interpret params and call BatchActor" in {
 
-      val params = "testParams"
+      val params = "{\"p1\":\"testParams\"}"
 
-      val result = Post("/tpreparator", HttpEntity(`application/json`, s"""{"params": "$params"}""")) ~> api.routes ~> runRoute
+      val result = Post("/tpreparator", HttpEntity(`application/json`, s"""{"params":$params}""")) ~> api.routes ~> runRoute
 
       val expectedMessage = BatchExecute(protocol, params)
       actor.expectMsg(expectedMessage)
@@ -359,7 +408,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val defaultParams = ""
     val protocol = "trainer_mockedProtocol"
 
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null){
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null, null){
       override def generateProtocol(actionName: String):String = protocol
     }
 
@@ -367,9 +416,9 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
 
     "interpret params and call BatchActor" in {
 
-      val params = "testParams"
+      val params = "{\"p1\":\"testParams\"}"
 
-      val result = Post("/trainer", HttpEntity(`application/json`, s"""{"params": "$params"}""")) ~> api.routes ~> runRoute
+      val result = Post("/trainer", HttpEntity(`application/json`, s"""{"params":$params}""")) ~> api.routes ~> runRoute
 
       val expectedMessage = BatchExecute(protocol, params)
       actor.expectMsg(expectedMessage)
@@ -401,15 +450,15 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val defaultParams = ""
     val protocol = "evaluator_mockedProtocol"
 
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null){
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null, null){
       override def generateProtocol(actionName: String):String = protocol
     }
 
     "interpret params and call BatchActor" in {
 
-      val params = "testParams"
+      val params = "{\"p1\":\"testParams\"}"
 
-      val result = Post("/evaluator", HttpEntity(`application/json`, s"""{"params": "$params"}""")) ~> api.routes ~> runRoute
+      val result = Post("/evaluator", HttpEntity(`application/json`, s"""{"params":$params}""")) ~> api.routes ~> runRoute
 
       val expectedMessage = BatchExecute(protocol, params)
       actor.expectMsg(expectedMessage)
@@ -441,7 +490,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val defaultParams = ""
     val protocol = "pipeline_mockedProtocol"
 
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("pipeline" -> actor.ref), null){
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("pipeline" -> actor.ref), null, null){
       override def generateProtocol(actionName: String):String = protocol
     }
 
@@ -449,9 +498,9 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
 
     "interpret params and call PipelineActor" in {
 
-      val params = "testParams"
+      val params = "{\"p1\":\"testParams\"}"
 
-      val result = Post("/pipeline", HttpEntity(`application/json`, s"""{"params": "$params"}""")) ~> api.routes ~> runRoute
+      val result = Post("/pipeline", HttpEntity(`application/json`, s"""{"params":$params}""")) ~> api.routes ~> runRoute
 
       val expectedMessage = PipelineExecute(protocol, params)
       actor.expectMsg(expectedMessage)
@@ -481,7 +530,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null, null)
 
     "call OnlineReload" in {
 
@@ -512,7 +561,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null, null)
 
     "call OnlineReload" in {
 
@@ -543,7 +592,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null, null)
 
     "call BatchReload" in {
 
@@ -574,7 +623,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null, null)
 
     "call BatchReload" in {
 
@@ -605,7 +654,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null, null)
 
     "call BatchReload" in {
 
@@ -636,7 +685,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null, null)
 
     "interpret and respond OK with media type json" in {
 
@@ -691,7 +740,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
         version = "1"
       )
 
-      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null)
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("predictor" -> actor.ref), null, null)
 
       val result = Get("/predictor/health") ~> api.routes ~> runRoute
 
@@ -711,7 +760,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null, null)
 
     "interpret and respond OK with media type json" in {
 
@@ -766,7 +815,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
         version = "1"
       )
 
-      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null)
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("feedback" -> actor.ref), null, null)
 
       val result = Get("/feedback/health") ~> api.routes ~> runRoute
 
@@ -786,7 +835,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("acquisitor" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("acquisitor" -> actor.ref), null, null)
 
     "interpret and respond OK with media type json" in {
 
@@ -841,7 +890,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
         version = "1"
       )
 
-      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("acquisitor" -> actor.ref), null)
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("acquisitor" -> actor.ref), null, null)
 
       val result = Get("/acquisitor/health") ~> api.routes ~> runRoute
 
@@ -861,7 +910,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null, null)
 
     "interpret and respond OK with media type json" in {
 
@@ -916,7 +965,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
         version = "1"
       )
 
-      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null)
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null, null)
 
       val result = Get("/tpreparator/health") ~> api.routes ~> runRoute
 
@@ -936,7 +985,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null, null)
 
     "interpret and respond OK with media type json" in {
 
@@ -991,7 +1040,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
         version = "1"
       )
 
-      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null)
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null, null)
 
       val result = Get("/trainer/health") ~> api.routes ~> runRoute
 
@@ -1012,7 +1061,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null, null)
 
     "interpret and respond OK with media type json" in {
 
@@ -1067,7 +1116,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
         version = "1"
       )
 
-      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null)
+      val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null, null)
 
       val result = Get("/evaluator/health") ~> api.routes ~> runRoute
 
@@ -1087,7 +1136,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("acquisitor" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("acquisitor" -> actor.ref), null, null)
 
     "be requested with a valid protocol" in {
       val protocol = "testProtocol"
@@ -1126,7 +1175,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("tpreparator" -> actor.ref), null, null)
 
     "be requested with a valid protocol" in {
       val protocol = "testProtocol"
@@ -1165,7 +1214,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("trainer" -> actor.ref), null, null)
 
     "be requested with a valid protocol" in {
       val protocol = "testProtocol"
@@ -1204,7 +1253,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("evaluator" -> actor.ref), null, null)
 
     "be requested with a valid protocol" in {
       val protocol = "testProtocol"
@@ -1243,7 +1292,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val actor = TestProbe()
     val defaultParams = ""
-    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("pipeline" -> actor.ref), null)
+    val api = new GenericAPI(system, metadata, defaultParams, Map[String, ActorRef]("pipeline" -> actor.ref), null, null)
 
     "be requested with a valid protocol" in {
       val protocol = "testProtocol"
@@ -1282,7 +1331,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     val metadata = MetadataMock.simpleMockedMetadata()
     val defaultParams = ""
     val docsFilePath = "xxx/xxx.yaml"
-    val api = new GenericAPI(system, metadata, defaultParams, null, docsFilePath)
+    val api = new GenericAPI(system, metadata, defaultParams, null, docsFilePath, null)
 
     "interpret and respond redirect" in {
 
@@ -1308,7 +1357,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
   "getMetadata method" should {
     "return right value" in {
       val metadata = MetadataMock.simpleMockedMetadata()
-      val api = new GenericAPI(system, metadata, "", null, null)
+      val api = new GenericAPI(system, metadata, "", null, null, null)
 
       api.getMetadata shouldEqual metadata
     }
@@ -1317,7 +1366,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
   "getSystem method" should {
     "return right value" in {
       val metadata = MetadataMock.simpleMockedMetadata()
-      val api = new GenericAPI(system, metadata, "", null, null)
+      val api = new GenericAPI(system, metadata, "", null, null, null)
 
       api.getSystem shouldEqual system
     }
@@ -1327,7 +1376,7 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
     "return right value" in {
       val metadata = MetadataMock.simpleMockedMetadata()
       val params = "params"
-      val api = new GenericAPI(system, metadata, params, null, null)
+      val api = new GenericAPI(system, metadata, params, null, null, null)
 
       api.getEngineParams shouldEqual params
     }
@@ -1339,10 +1388,68 @@ class GenericAPITest extends WordSpec with ScalatestRouteTest with Matchers with
       val params = "params"
       val actor1 = TestProbe()
       val actors = Map[String, ActorRef]("actor1" -> actor1.ref)
-      val api = new GenericAPI(system, metadata, params, actors, null)
+      val api = new GenericAPI(system, metadata, params, actors, null, null)
 
       api.manageableActors shouldEqual actors
       api.manageableActors("actor1") shouldEqual actor1.ref
+    }
+  }
+
+  "validate method" should {
+    "pass without error" in {
+      val metadata = MetadataMock.simpleMockedMetadata()
+      val params = "params"
+      val actor1 = TestProbe()
+      val actors = Map[String, ActorRef]("actor1" -> actor1.ref)
+      val messageSchemaFile = getClass.getResource("/engine_home/predictor-message.schema").getPath
+      val schemas = Map[String, String]("predictor-message"-> Source.fromFile(messageSchemaFile).mkString)
+
+      val api = new GenericAPI(system, metadata, params, actors, null, schemas)
+      val message: Option[JsValue] = Some("{\"firstName\":\"John\", \"lastName\":\"Doe\"}".parseJson)
+
+      try{
+        api.validate("predictor-message", message)
+        assert(true)
+
+      }catch {
+        case _: Throwable =>
+          assert(false)
+      }
+
+    }
+    "not pass with one problem" in {
+      val metadata = MetadataMock.simpleMockedMetadata()
+      val params = "params"
+      val actor1 = TestProbe()
+      val actors = Map[String, ActorRef]("actor1" -> actor1.ref)
+      val messageSchemaFile = getClass.getResource("/engine_home/predictor-message.schema").getPath
+      val schemas = Map[String, String]("predictor-message"-> Source.fromFile(messageSchemaFile).mkString)
+
+      val api = new GenericAPI(system, metadata, params, actors, null, schemas)
+      val message: Option[JsValue] = Some("{\"firstName\":\"John\"}".parseJson)
+
+      val caught = intercept[IllegalArgumentException] {
+        api.validate("predictor-message", message)
+      }
+
+      caught.getMessage() shouldEqual "object has missing required properties ([\"lastName\"])"
+    }
+    "not pass with two problem" in {
+      val metadata = MetadataMock.simpleMockedMetadata()
+      val params = "params"
+      val actor1 = TestProbe()
+      val actors = Map[String, ActorRef]("actor1" -> actor1.ref)
+      val messageSchemaFile = getClass.getResource("/engine_home/predictor-message.schema").getPath
+      val schemas = Map[String, String]("predictor-message"-> Source.fromFile(messageSchemaFile).mkString)
+
+      val api = new GenericAPI(system, metadata, params, actors, null, schemas)
+      val message: Option[JsValue] = Some("{\"xxx\":\"John\"}".parseJson)
+
+      val caught = intercept[IllegalArgumentException] {
+        api.validate("predictor-message", message)
+      }
+
+      caught.getMessage() shouldEqual "object has missing required properties ([\"firstName\",\"lastName\"])"
     }
   }
 }

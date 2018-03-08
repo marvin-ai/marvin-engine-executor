@@ -16,8 +16,7 @@
  */
 package org.marvin.executor
 
-import java.io.{FileInputStream, FileNotFoundException}
-import java.nio.file.Paths
+import java.io.FileNotFoundException
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import com.fasterxml.jackson.core.JsonParseException
@@ -105,16 +104,11 @@ class EngineExecutorApp {
     JsonUtil.toJson(readJsonIfFileExists[Map[String, String]](filePath))
   }
 
-  def getPredictorSchemaFileString(): String = {
-    val messageSchemaFile = s"${vmParams("engineHome").asInstanceOf[String]}/MessageSchema.json"
-    try{
-      Source.fromFile(messageSchemaFile).mkString
-    } catch{
-      case e: FileNotFoundException => {
-        log.info(s"Will not validate predictor input messages against schema. Schema file [$messageSchemaFile] not found.")
-        null
-      }
-    }
+  def getSchema(actionName: String, target: String): String = {
+    log.info(s"Getting schema file for validate the ${actionName} ${target}...")
+
+    val filePath = s"${vmParams("engineHome").asInstanceOf[String]}/${actionName}-${target}.schema"
+    JsonUtil.toJson(readJsonIfFileExists[Map[String, String]](filePath))
   }
 
   def getDocsFilePath(): String = {
@@ -138,7 +132,8 @@ class EngineExecutorApp {
       "protocol" -> ConfigurationContext.getStringConfigOrDefault("protocol", ""),
       "enableAdmin" -> ConfigurationContext.getBooleanConfigOrDefault("enableAdmin", false),
       "adminPort" -> ConfigurationContext.getIntConfigOrDefault("adminPort", 50100),
-      "adminHost" -> ConfigurationContext.getStringConfigOrDefault("adminHost", "127.0.0.1")
+      "adminHost" -> ConfigurationContext.getStringConfigOrDefault("adminHost", "127.0.0.1"),
+      "enableValidation" -> ConfigurationContext.getBooleanConfigOrDefault("enableValidation", false)
     )
 
     parameters
@@ -172,7 +167,14 @@ class EngineExecutorApp {
     val params = getEngineParameters()
     val config = setupConfig()
     val docsFilePath = getDocsFilePath()
-    GenericAPI.predictorSchemaFile = getPredictorSchemaFileString()
+
+    var schemas: Map[String, String] = null
+    if (vmParams("enableValidation").asInstanceOf[Boolean]){
+        schemas = Map[String, String](
+          "predictor-message" -> getSchema("predictor", "message"),
+          "feedback-message" -> getSchema("feedback", "message")
+        )
+    }
 
     val system = ActorSystem(metadata.name, config)
 
@@ -188,7 +190,7 @@ class EngineExecutorApp {
       "feedback" -> system.actorOf(Props(new OnlineAction("feedback", metadata)), name = "feedbackActor")
     )
 
-    api = new GenericAPI(system, metadata, params, actors, docsFilePath)
+    api = new GenericAPI(system, metadata, params, actors, docsFilePath, schemas)
 
     //send model protocol to be reloaded by predictor service
     actors("predictor") ! Reload(vmParams("protocol").asInstanceOf[String])
