@@ -49,8 +49,12 @@ class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging 
     )
   }
 
-  def validProtocol(protocol: Path): Boolean = {
-    new java.io.File(protocol.toString).exists
+  def validatePath(path: Path, isRemote: Boolean): Boolean = {
+    if (isRemote) {
+      s3Client.doesObjectExist(metadata.s3BucketName, path.toString)
+    } else {
+      new java.io.File(path.toString).exists
+    }
   }
 
   override def receive: Receive = {
@@ -60,14 +64,14 @@ class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging 
       val localToSave = new File(uris("localPath").toString)
 
       // Validate if the protocol is correct
-      if (!s3Client.doesObjectExist(metadata.s3BucketName, uris("remotePath").toString)) {
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
-      }
-      else {
+      if (validatePath(uris("remotePath"), true)) {
         log.info(s"Copying files from ${metadata.s3BucketName}: ${uris("remotePath")} to ${uris("localPath")}")
         //Get artifact named "uris("remotePath")" from S3 Bucket and save it to local
         s3Client.getObject(new GetObjectRequest(metadata.s3BucketName, uris("remotePath").toString), localToSave)
         log.info(s"File ${uris("localPath")} saved!")
+      }
+      else {
+        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
       }
 
       sender ! Done
@@ -78,14 +82,14 @@ class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging 
       val fileToUpload = new File(uris("localPath").toString)
 
       // Validate if the protocol is correct
-      if (!validProtocol(uris("localPath"))) {
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
-      }
-      else {
+      if (validatePath(uris("localPath"), false)) {
         log.info(s"Copying files from ${uris("localPath")} to ${metadata.s3BucketName}: ${uris("remotePath")}")
         //Get local artifact and save to S3 Bucket with name "uris("remotePath")"
         s3Client.putObject(metadata.s3BucketName, uris("remotePath").toString, fileToUpload)
         log.info(s"File ${uris("localPath")} saved!")
+      }
+      else {
+        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
       }
 
       sender ! Done

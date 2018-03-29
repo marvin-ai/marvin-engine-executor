@@ -45,8 +45,8 @@ class ArtifactFSSaver(metadata: EngineMetadata) extends Actor with ActorLogging 
     log.info(s"File ${destination} saved!")
   }
 
-  def validProtocol(protocol: Path): Boolean = {
-    new java.io.File(protocol.toString).exists
+  def validatePath(path: Path): Boolean = {
+    new java.io.File(path.toString).exists
   }
 
   override def receive: Receive = {
@@ -55,10 +55,10 @@ class ArtifactFSSaver(metadata: EngineMetadata) extends Actor with ActorLogging 
       val uris = generatePaths(artifactName, protocol)
 
       // Validate if the protocol is correct
-      if (!validProtocol(uris("remotePath")))
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
-      else
+      if (validatePath(uris("remotePath")))
         copyFile(uris("remotePath"), uris("localPath"))
+      else
+        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
 
       sender ! Done
 
@@ -67,10 +67,10 @@ class ArtifactFSSaver(metadata: EngineMetadata) extends Actor with ActorLogging 
       val uris = generatePaths(artifactName, protocol)
 
       // Validate if the protocol is correct
-      if (!validProtocol(uris("localPath")))
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
-      else
+      if (validatePath(uris("localPath")))
         copyFile(uris("localPath"), uris("remotePath"))
+      else
+        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
 
       sender ! Done
 

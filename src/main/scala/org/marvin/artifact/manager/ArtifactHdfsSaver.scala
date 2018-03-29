@@ -59,8 +59,12 @@ class ArtifactHdfsSaver(metadata: EngineMetadata) extends Actor with ActorLoggin
     }
   }
 
-  def validProtocol(protocol: Path): Boolean = {
-    new java.io.File(protocol.toString).exists
+  def validatePath(path: Path, isRemote: Boolean, fs: FileSystem): Boolean = {
+    if (isRemote) {
+      fs.exists(path)
+    } else {
+      new java.io.File(path.toString).exists
+    }
   }
 
   override def receive: Receive = {
@@ -69,14 +73,14 @@ class ArtifactHdfsSaver(metadata: EngineMetadata) extends Actor with ActorLoggin
       val fs = FileSystem.get(conf)
       val uris = generatePaths(artifactName, protocol)
 
-      if (!fs.exists(uris("remotePath"))) {
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
-      }
-      else {
+      if (validatePath(uris("remotePath"), true, fs)) {
         log.info(s"Copying files from ${uris("remotePath")} to ${uris("localPath")}")
         fs.copyToLocalFile(false, uris("remotePath"), uris("localPath"), false)
         fs.close()
         log.info(s"File ${uris("localPath")} saved!")
+      }
+      else {
+        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
       }
 
       sender ! Done
@@ -86,14 +90,14 @@ class ArtifactHdfsSaver(metadata: EngineMetadata) extends Actor with ActorLoggin
       val fs = FileSystem.get(conf)
       val uris = generatePaths(artifactName, protocol)
 
-      if (!validProtocol(uris("localPath"))) {
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
-      }
-      else {
+      if (validatePath(uris("localPath"), false, fs)) {
         log.info(s"Copying files from ${uris("localPath")} to ${uris("remotePath")}")
         fs.copyFromLocalFile(uris("localPath"), uris("remotePath"))
         fs.close()
         log.info(s"File ${uris("localPath")} saved!")
+      }
+      else {
+        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
       }
 
       sender ! Done
