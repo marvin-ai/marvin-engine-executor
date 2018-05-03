@@ -58,7 +58,7 @@ class ArtifactFSSaver(metadata: EngineMetadata) extends Actor with ActorLogging 
       if (validatePath(uris("remotePath")))
         copyFile(uris("remotePath"), uris("localPath"))
       else
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
+        log.error(s"Invalid protocol: ${protocol}, save process canceled!")
 
       sender ! Done
 
@@ -70,7 +70,7 @@ class ArtifactFSSaver(metadata: EngineMetadata) extends Actor with ActorLogging 
       if (validatePath(uris("localPath")))
         copyFile(uris("localPath"), uris("remotePath"))
       else
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
+        log.error(s"Invalid protocol: ${protocol}, save process canceled!")
 
       sender ! Done
 

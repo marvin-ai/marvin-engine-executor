@@ -71,7 +71,7 @@ class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging 
         log.info(s"File ${uris("localPath")} saved!")
       }
       else {
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
+        log.error(s"Invalid protocol: ${protocol}, save process canceled!")
       }
 
       sender ! Done
@@ -89,7 +89,7 @@ class ArtifactS3Saver(metadata: EngineMetadata) extends Actor with ActorLogging 
         log.info(s"File ${uris("localPath")} saved!")
       }
       else {
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
+        log.error(s"Invalid protocol: ${protocol}, save process canceled!")
       }
 
       sender ! Done

@@ -80,7 +80,7 @@ class ArtifactHdfsSaver(metadata: EngineMetadata) extends Actor with ActorLoggin
         log.info(s"File ${uris("localPath")} saved!")
       }
       else {
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
+        log.error(s"Invalid protocol: ${protocol}, save process canceled!")
       }
 
       sender ! Done
@@ -97,7 +97,7 @@ class ArtifactHdfsSaver(metadata: EngineMetadata) extends Actor with ActorLoggin
         log.info(s"File ${uris("localPath")} saved!")
       }
       else {
-        log.error(s"Invalid protocol: ${protocol}, reload action canceled!")
+        log.error(s"Invalid protocol: ${protocol}, save process canceled!")
       }
 
       sender ! Done
