@@ -30,7 +30,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.github.fge.jsonschema.core.exceptions.ProcessingException
 import org.marvin.executor.actions.BatchAction.{BatchExecute, BatchExecutionStatus, BatchHealthCheck, BatchReload}
-import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck}
+import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineGet, OnlineHealthCheck}
 import org.marvin.executor.actions.PipelineAction.{PipelineExecute, PipelineExecutionStatus}
 import org.marvin.executor.api.GenericAPI._
 import org.marvin.executor.statemachine.Reload
@@ -296,6 +296,18 @@ class GenericAPI(system: ActorSystem,
             }
           }
         } ~
+        path("evaluator" / "metrics") {
+          parameters('protocol) { (protocol) =>
+            val responseFuture = getMetrics("evaluator", protocol)
+
+            onComplete(responseFuture) {
+              case Success(response) => complete(DefaultHttpResponse(response))
+              case Failure(e) =>
+                log.info("RECEIVE FAILURE!!! " + e.getMessage + e.getClass)
+                failWith(e)
+            }
+          }
+        } ~
         path("pipeline" / "status") {
           parameters('protocol) { (protocol) =>
             val responseFuture = status("pipeline", protocol)
@@ -372,6 +384,15 @@ class GenericAPI(system: ActorSystem,
     implicit val futureTimeout: Timeout = onlineActionTimeout
 
     (actors(actionName) ? OnlineExecute(message, params)).mapTo[String]
+  }
+
+  def getMetrics(actionName: String, protocol: String): Future[String] = {
+    log.info(s"Request for $actionName] received.")
+
+    implicit val ec: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
+    implicit val futureTimeout: Timeout = reloadTimeout
+
+    (actors(actionName) ? OnlineGet(protocol)).mapTo[String]
   }
 
   def reload(actionName: String, actionType:String, protocol: String): String = {
