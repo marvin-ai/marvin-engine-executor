@@ -23,10 +23,10 @@ import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import io.grpc.StatusRuntimeException
 import org.marvin.artifact.manager.ArtifactSaver
-import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineGet, OnlineHealthCheck, OnlineReload}
+import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck, OnlineReload}
 import org.marvin.executor.proxies.EngineProxy.{ExecuteOnline, HealthCheck, Reload}
 import org.marvin.executor.proxies.OnlineActionProxy
-import org.marvin.artifact.manager.ArtifactSaver.{GetSavedArtifact, SaveToLocal}
+import org.marvin.artifact.manager.ArtifactSaver.SaveToLocal
 import org.marvin.model.{EngineActionMetadata, EngineMetadata}
 import org.marvin.util.ProtocolUtil
 
@@ -39,7 +39,6 @@ object OnlineAction {
   case class OnlineExecute(message: String, params: String)
   case class OnlineReload(protocol: String)
   case class OnlineHealthCheck()
-  case class OnlineGet(protocol: String)
 }
 
 class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor with ActorLogging {
@@ -98,22 +97,6 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
         }
       }
 
-    case OnlineGet(protocol) =>
-      implicit val futureTimeout = Timeout(metadata.reloadTimeout milliseconds)
-
-      log.info(s"Starting to process get to Metrics. Protocol: [$protocol].")
-
-      val splitedProtocols = ProtocolUtil.splitProtocol(protocol, metadata)
-      val future = artifactSaver ? GetSavedArtifact("metrics", protocol)
-      val origSender = sender()
-
-      future.onComplete{
-        case Success(_) => origSender ! future
-        case Failure(e) => {
-          log.error(s"Failure to load artifact using protocol $protocol.")
-          origSender ! Status.Failure(e)
-        }
-      }
 
     case OnlineHealthCheck =>
       implicit val futureTimeout = Timeout(metadata.healthCheckTimeout milliseconds)

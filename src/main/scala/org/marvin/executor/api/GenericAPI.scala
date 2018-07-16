@@ -29,8 +29,8 @@ import akka.http.scaladsl.server.{HttpApp, Route, StandardRoute}
 import akka.pattern.ask
 import akka.util.Timeout
 import com.github.fge.jsonschema.core.exceptions.ProcessingException
-import org.marvin.executor.actions.BatchAction.{BatchExecute, BatchExecutionStatus, BatchHealthCheck, BatchReload}
-import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineGet, OnlineHealthCheck}
+import org.marvin.executor.actions.BatchAction.{BatchExecute, BatchExecutionStatus, BatchMetrics, BatchHealthCheck, BatchReload}
+import org.marvin.executor.actions.OnlineAction.{OnlineExecute, OnlineHealthCheck}
 import org.marvin.executor.actions.PipelineAction.{PipelineExecute, PipelineExecutionStatus}
 import org.marvin.executor.api.GenericAPI._
 import org.marvin.executor.statemachine.Reload
@@ -80,6 +80,7 @@ class GenericAPI(system: ActorSystem,
   val batchActionTimeout = Timeout(metadata.batchActionTimeout milliseconds)
   val reloadTimeout = Timeout(metadata.reloadTimeout milliseconds)
   val pipelineTimeout = Timeout(metadata.pipelineTimeout milliseconds)
+  val metricsTimeout = Timeout(metadata.metricsTimeout milliseconds)
 
   val log: LoggingAdapter = Logging.getLogger(system, this)
 
@@ -298,7 +299,7 @@ class GenericAPI(system: ActorSystem,
         } ~
         path("evaluator" / "metrics") {
           parameters('protocol) { (protocol) =>
-            val responseFuture = getMetrics("evaluator", protocol)
+            val responseFuture = metrics(protocol)
 
             onComplete(responseFuture) {
               case Success(response) => complete(DefaultHttpResponse(response))
@@ -386,13 +387,13 @@ class GenericAPI(system: ActorSystem,
     (actors(actionName) ? OnlineExecute(message, params)).mapTo[String]
   }
 
-  def getMetrics(actionName: String, protocol: String): Future[String] = {
-    log.info(s"Request for $actionName] received.")
+  def metrics(protocol: String): Future[String] = {
+    log.info(s"Request metrics for protocol $protocol] received.")
 
     implicit val ec: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
-    implicit val futureTimeout: Timeout = reloadTimeout
+    implicit val futureTimeout: Timeout = onlineActionTimeout
 
-    (actors(actionName) ? OnlineGet(protocol)).mapTo[String]
+    (actors("evaluator") ? BatchMetrics(protocol)).mapTo[String]
   }
 
   def reload(actionName: String, actionType:String, protocol: String): String = {

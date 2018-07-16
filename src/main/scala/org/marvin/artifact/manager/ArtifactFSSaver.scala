@@ -20,7 +20,7 @@ import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 
 import akka.Done
 import akka.actor.{Actor, ActorLogging}
-import org.marvin.artifact.manager.ArtifactSaver.{GetSavedArtifact, SaveToLocal, SaveToRemote}
+import org.marvin.artifact.manager.ArtifactSaver.{GetArtifact, SaveToLocal, SaveToRemote}
 import org.marvin.model.EngineMetadata
 
 class ArtifactFSSaver(metadata: EngineMetadata) extends Actor with ActorLogging {
@@ -74,14 +74,14 @@ class ArtifactFSSaver(metadata: EngineMetadata) extends Actor with ActorLogging 
 
       sender ! Done
 
-    case GetSavedArtifact(artifactName, protocol) =>
+    case GetArtifact(artifactName, protocol) =>
       log.info("Receive message and starting to working...")
       val uris = generatePaths(artifactName, protocol)
-      var response: String = null
+      var response: String = ""
 
       // Validate if the protocol is correct
       if (validatePath(uris("localPath")))
-        response = scala.io.Source.fromFile(uris("localPath").toString).mkString
+        response = scala.io.Source.fromFile(uris("localPath").toString).getLines.mkString
       else
         log.error(s"Invalid protocol: ${protocol}, load process canceled!")
 
