@@ -97,7 +97,6 @@ class OnlineAction(actionName: String, metadata: EngineMetadata) extends Actor w
         }
       }
 
-
     case OnlineHealthCheck =>
       implicit val futureTimeout = Timeout(metadata.healthCheckTimeout milliseconds)
       log.info(s"Starting to process health to $actionName.")
