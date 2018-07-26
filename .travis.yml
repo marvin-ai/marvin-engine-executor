@@ -22,6 +22,7 @@ cache:
   directories:
   - $HOME/.sbt
   - $HOME/.m2
+  - $HOME/.ivy2
 
 before_cache:
 - find $HOME/.ivy2 -name \"ivydata-*.properties\" -delete
