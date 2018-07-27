@@ -20,7 +20,6 @@ jdk: oraclejdk8
 
 cache:
   directories:
-  - $HOME/.sbt
   - $HOME/.m2
   - $HOME/.ivy2
 
