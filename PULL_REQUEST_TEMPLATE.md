@@ -14,6 +14,4 @@ How to test new changes:
 -
 -
 
-@takabayashi
-@rafaelnovello
-@oldfly
+@marvin-ai/marvin-core-team
